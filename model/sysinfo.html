@@ -4,78 +4,83 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>哪吒监控</title>
-<!-- 使用 flag-icons 和 font-logos 的 CDN 样式 -->
+<!-- flag-icons 和 font-logos CDN -->
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/font-logos@1/assets/font-logos.css">
 <style>
-    /* 全局重置与暗色主题 */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        background: #0b0d12;
-        color: #e8edf5;
-        padding: 30px;
-        width: 820px;
+    /* 全局重置：完全铺满，无空白 */
+    * { 
+        margin: 0; 
+        padding: 0; 
+        box-sizing: border-box; 
+    }
+    html, body {
+        width: 100%;
         min-height: 100vh;
+        background: #0a0a0a;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #e8edf5;
         display: flex;
         align-items: flex-start;
         justify-content: center;
+        padding: 24px;
     }
 
     .dashboard {
-        width: 100%;
-        max-width: 780px;
-        background: #151a24;
-        border-radius: 28px;
-        padding: 30px 28px 24px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        width: 820px;
+        max-width: 100%;
+        background: #111111;
+        border-radius: 32px;
+        padding: 28px 30px 22px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.04);
     }
 
-    /* 顶部标题与统计 */
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 26px;
+        margin-bottom: 28px;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 12px 16px;
     }
     .header-left {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
     }
-    .logo-icon {
-        font-size: 28px;
-        line-height: 1;
+    .logo {
+        height: 40px;
+        width: auto;
+        display: block;
+        border-radius: 8px;
     }
     .header h1 {
-        font-size: 24px;
-        font-weight: 600;
-        background: linear-gradient(135deg, #f0f4ff 0%, #a0b8e0 100%);
+        font-size: 26px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: 0.5px;
+        background: linear-gradient(135deg, #ffffff 60%, #8888cc 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        letter-spacing: -0.3px;
     }
     .stats {
         display: flex;
-        gap: 16px;
+        gap: 14px;
         flex-wrap: wrap;
     }
     .stat-item {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(4px);
-        padding: 6px 16px 6px 14px;
+        background: rgba(255, 255, 255, 0.04);
+        padding: 6px 18px 6px 14px;
         border-radius: 40px;
         font-size: 14px;
         font-weight: 500;
         display: flex;
         align-items: center;
         gap: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        color: #b6c8e0;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        color: #b0c4e0;
     }
     .stat-item .num {
         font-weight: 700;
@@ -85,31 +90,28 @@
     .stat-item .online-dot { color: #4ade80; }
     .stat-item .offline-dot { color: #f87171; }
 
-    /* 服务器网格 */
     .server-grid {
         display: flex;
         flex-direction: column;
         gap: 12px;
-        margin-top: 6px;
+        margin-top: 4px;
     }
 
-    /* 服务器卡片 */
     .server-card {
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.025);
+        border-radius: 20px;
         padding: 16px 20px 14px 20px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.04);
         transition: all 0.15s ease;
         display: flex;
         flex-direction: column;
         gap: 12px;
     }
     .server-card.offline {
-        opacity: 0.6;
-        border-color: rgba(255, 100, 100, 0.15);
+        opacity: 0.55;
+        border-color: rgba(255, 100, 100, 0.1);
     }
 
-    /* 卡片第一行：名称 + 状态 + 图标 */
     .card-row {
         display: flex;
         justify-content: space-between;
@@ -125,14 +127,13 @@
     .flag-icon {
         font-size: 22px;
         line-height: 1;
-        border-radius: 4px;
         width: 28px;
         text-align: center;
     }
     .server-name {
         font-size: 17px;
         font-weight: 600;
-        color: #eef3fc;
+        color: #f0f6ff;
         letter-spacing: -0.2px;
     }
     .server-status {
@@ -146,18 +147,18 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(74, 222, 128, 0.15);
+        background: rgba(74, 222, 128, 0.12);
         color: #4ade80;
         padding: 3px 14px 3px 10px;
         border-radius: 40px;
         font-size: 13px;
         font-weight: 600;
-        border: 1px solid rgba(74, 222, 128, 0.15);
+        border: 1px solid rgba(74, 222, 128, 0.1);
     }
     .status-badge.offline {
-        background: rgba(248, 113, 113, 0.12);
+        background: rgba(248, 113, 113, 0.08);
         color: #f87171;
-        border-color: rgba(248, 113, 113, 0.15);
+        border-color: rgba(248, 113, 113, 0.1);
     }
     .status-dot {
         width: 8px;
@@ -165,25 +166,23 @@
         border-radius: 50%;
         background: #4ade80;
         display: inline-block;
-        box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+        box-shadow: 0 0 8px rgba(74, 222, 128, 0.2);
     }
     .status-dot.offline {
         background: #f87171;
-        box-shadow: 0 0 6px rgba(248, 113, 113, 0.2);
+        box-shadow: 0 0 8px rgba(248, 113, 113, 0.15);
     }
-
     .os-icon {
         font-size: 20px;
-        opacity: 0.7;
-        margin-left: 4px;
+        opacity: 0.6;
+        margin-left: 2px;
     }
 
-    /* 卡片第二行：资源进度条 */
     .resource-row {
         display: flex;
         flex-wrap: wrap;
         gap: 14px 28px;
-        padding-top: 4px;
+        padding-top: 2px;
     }
     .resource-item {
         display: flex;
@@ -195,14 +194,14 @@
     .resource-label {
         font-size: 13px;
         font-weight: 500;
-        color: #9aafcf;
+        color: #8899bb;
         width: 48px;
         flex-shrink: 0;
     }
     .resource-bar-wrap {
         flex: 1;
         height: 6px;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
         border-radius: 6px;
         overflow: hidden;
         min-width: 60px;
@@ -222,47 +221,47 @@
     .resource-value {
         font-size: 13px;
         font-weight: 600;
-        color: #d6e3f8;
+        color: #c8d8f0;
         width: 52px;
         text-align: right;
         flex-shrink: 0;
         font-variant-numeric: tabular-nums;
     }
 
-    /* 底部时间戳 */
     .footer {
         margin-top: 24px;
         padding-top: 16px;
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
         display: flex;
         justify-content: flex-end;
         font-size: 12px;
-        color: #5a6f8c;
+        color: #4a5a7a;
         letter-spacing: 0.3px;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
     }
     .footer .brand {
-        color: #7a8fab;
+        color: #6a7a9a;
     }
 
-    /* 小屏幕适配 */
     @media (max-width: 600px) {
-        body { padding: 14px; width: 100%; }
-        .dashboard { padding: 18px; }
+        body { padding: 12px; }
+        .dashboard { padding: 18px; border-radius: 20px; }
         .header { flex-direction: column; align-items: stretch; }
         .stats { justify-content: flex-start; }
         .resource-row { flex-direction: column; gap: 8px; }
         .resource-item { min-width: unset; }
+        .logo { height: 32px; }
+        .header h1 { font-size: 20px; }
     }
 </style>
 </head>
 <body>
 <div class="dashboard">
-    <!-- 头部 -->
     <div class="header">
         <div class="header-left">
-            <span class="logo-icon">📊</span>
+            <!-- 官方 Logo Base64 内嵌 -->
+            <img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAACZdJREFUeNrtXU2MHcUV/rp7vvfb82/sJbZZS2BhgW3CJkTEEuYDQVAIkUJiwYIjJLhkyyUXDkSSORBFAUWBhDggIkVIGE4OIopigk0gJHYEYW8mMcHCiQlBf5Z1jL1ez+yb7unuKnu6anqme7p7qvt6PrD8e2fX1Knz1Xn1p6ogkUgkEolEIpFIJBKJRLIYk2mObm1urNPGIYr0AhXoCkG0RrT2S1PJkli5mQYbL/UD7+kRrSW2hIcm7AvCprA8n7Xf6DDlX7xf/YRS7cRSCrgC4GcBvCYA7zIJ6GCmkgCa07oZREtUWDPTg50nD0KFUHzPgLsB/D2nTTi7mhA2gB9u0M5j8q05dAA/eBIP5AehjSvq5xrWXsohzM4nRK8C4WcC+JsKYYcJ4eehM0BifN2ktp8iwh0K05Hpkb7FjxAAsM44BZkFBlU9nqgP1JrrxHcAeD+AP81UAgMxAcCaQbmp7vYh1zFSS+O7uAB/R9V3h8K4A8CXM5VBU9y9D8A3TClVQ3H6nRwFAG6uT+eXa14k4BUEgI7w8c8JqN8A+O8Eaz0p2mBrMVIcXZZnMAvw/R6pbgHwFCBfTtdf9MZ/0SIACO7FB17JxR4hvLsL2i3b7cMvAviAQrU/ZdTV/QA2RX5zIRd7hPPlfWkAawgKbHxAdMA1AN4G0Lr0qv1l57mCEACMEUYKYy8B6ADfBfC9i0DBAiQuzkG9K/0BEqKgh8H2Mh6KKgRwRO5/g+CfD1mAGwFcB+BeAL8pJw7KXpUhyD82WQoEdcQs6vPZX1wE4MZaHwzSq0BC+FwMIYQVAviWYrB2APhxaZ+WwnkCyN8A4EPI1y/EoE9QfA7AtxQJLApG4Q8Qwq1CNDtUlIFbUgCgDv4mATjuH1lOGgC/ocK9HcClacHZdhbIU5PIS9cD8yE5aRB8E7A4N/kmpArT3QD2AsKE1heqNncL/Ac/gLYF0aY82eQyTxE9QhxV2Qbgv1KKBQAufPonwzBcX/wBwH+N8IEMLQHRIwD+0QLhBhK3A5Cg0GmzD/fyADj71bdF8/kAXgJkR4T0GQC/SiGmeE9Sn5HwA1IYqggB4PHeU+Nobq/v/0dhkS4DWmHUCb/2DxBfBvB8DEHBWQA/OGlhFwZOCZ0AvpWbBSgVQwQA9N9dLbjgvwB8NqaXe7rbmPef7Tne6SRAKof7T/Y2UxqgLD3MADYDuCwA9gSLeC6AX7fSPpYr/4nBY6ChglGrvTSJ1rSACwH8KIXOGGsKgD+A+GIEuBMAvgjghVbfqlhZ2Y+98S6hduPKBbROiZ0A0HeHY7hbCPrsL9t+/9nXe8c1s38LgLUY4k9GfBuAT8ccr+iONC1XxdpFGHQigcLrHwLwJAeufICe8O2BggL7GCitBOIKQB+3BuAzAB8puKGTa1JLeLYUwT+A4H+9pMsCsA8Lw+7BHeDFmMKlYAhA0gCQBkCyAKQBGDBNAJIGgDQAkgUgDcAAbQIkgfJsQH5CwXH9hJ+coZQHgN2XWQIgWQCkAZAHALJ1BcD4RlyXucYAxO1PL4cKc3Y1of3NlDSMDQBSpQFm2udploXkJSQA0KAEYIYRhSBkXh7T3y5xOQhq0g5qYFhoGg4hAI/Tl4k8KDDz2J7DqPz99KjLWlwGiA8DlOApkAH3Qga8B40CGLVv0CmA+v4afqFvQ61I4YixfgI8zY2lnjY4Y+9F/hKSqSX0KXq9UjYDUxLq4RjgrAJ4y/Oj5/r+t/xDA+y9Fjl/Z11xYd4KmUCBNnWn1LPjv/mzppWGCqYJj5+GfRKMAmijAXg7wM43A0P/GNnn3+Oaj+9aRFiTUU4gh1OSjTlXVijQdMxkOkTbRRKGZUKSygR/u3oyUPEKgYddr+wda7f4ltLY8E8RwD8awH51hEdOXSaaYz8S6IAxMECMtI/hC6G4pZfMvnC6db8a+/25t0g1bz0x/ncQo/UeITePqfoVj3/l/b4Nc7Afz/wwkgyrgnYOgDp1edv9f/4dPP2LC7Mhgd+HLn8E+9drvNWcJgXsz6/vcO+1nTzVYrxMnA8Q/u47tG3ZIMw4+ENYwVrb2Psk8p2Pg0L9F6uYg4d//R0s37aR8v5eLQjsnnE1AG/7vWagrQMf3vMR7P3BVdA+9QGAuhS1Yp6Bv+uOcT3wLtAef4FmPqZ69z+SHvVYyDKM0QAE3nyA/uZbS1wGnjvK/PEf/q/XOnL7lz8GAAMs+G7f8DA8bNHQf2tMZY2aSCMA8v4/4eS/fzP8B3mM67tO9MSY8lWA8U//lIY6b93fG+OO3lC1Fv2CULQzv+9gZuw8RllR5wsY8Qng0A+/RVnz1TBJvWYh7cQn0PRXjf1nGIA0ugCUBehXAlglBWB59N2Nl2A54T4tAysA0CwDlC7//3/9PegpR9RhCd21p9sSkS4A9NOHUo19f4fX3g35AM41/2ivV6tyCrRq3v/od7+L8rLNwRBgnFv0zrvwD3X2B3SjCjBuYcZ/huQAgL8P2j4mANjqtdQGGJcLcF1TzvV/LBmIxU8B//j9PocviulB8BeQYyf5sLhZQLIApWUBJeUBpJwLSP6AtGyAkgUgDYA0ALMAzPgDpADAAgCzAMgCIA3AIAAoJ08p5wNIOY7+VtQ+ayITwDQA8wwjgC4K5p69LmF9rLWQ+7ULW7bt2Kj0HIGkLP/3bg7S0FbAkhP49pebX6zYwK5nUdwD9tcGmshFg8Xq8v/X9hwQv3PxH0z8W1yK8C8Sg4lf6+1cQLUPw5x7RZ72Fw8zAyiAJYUX9/bb+2UKh16Awxd42q4g/ulnj+1XHOxO7sF+n73hF+8aQ/OD8gAjjf3GAeBbBuLgNv55EYOg4f0AXQADNw8j1H4wtwH4ZSAO+hEfbsPX9j0fnxH1ZDT5zgD0cAA8E6fFBuBzaAB4NyBsmkD1gwZY6JkX3rXgzAD+3Z1A64HwA4xPg88p07A7Me6CbxtM9dK4jLMIy37HSmXfvuwb4vwC1p9rOfZf0Kp5xW/Of3jXyCwA6Z8L18f+qQcDUFgPADn+ZYwPwP3BT2cpAj4DO7J/TD8zBYfybA2xR1h/IkAYO7UH2weRzKxmmQH5bgaf9wLhBwD8EMD9AK7LZIB1xZgCa+6Ddd+ibdUzF9a/Dy67L7MM8H81GbgD4f8ADP5nxdlJAIXri+AfQPF6VAgfzwTg/wUYAAW1BALp4CZOAAAAAElFTkSuQmCC" alt="哪吒监控" />
             <h1>哪吒监控</h1>
         </div>
         <div class="stats">
@@ -272,17 +271,13 @@
         </div>
     </div>
 
-    <!-- 服务器卡片列表 -->
     <div class="server-grid">
         {% for server in servers %}
         <div class="server-card {% if not server.online %}offline{% endif %}">
-            <!-- 第一行 -->
             <div class="card-row">
                 <div class="server-name-group">
-                    <!-- 国旗图标 -->
                     <span class="flag-icon fi fi-{{ server.country_code|lower }}"></span>
                     <span class="server-name">{{ server.name }}</span>
-                    <!-- 操作系统图标 (使用 font-logos) -->
                     {% if server.os_icon %}
                     <span class="os-icon {{ server.os_icon }}"></span>
                     {% endif %}
@@ -294,8 +289,6 @@
                     </span>
                 </div>
             </div>
-
-            <!-- 第二行：资源 -->
             <div class="resource-row">
                 <div class="resource-item">
                     <span class="resource-label">💻 CPU</span>
@@ -323,7 +316,6 @@
         {% endfor %}
     </div>
 
-    <!-- 底部 -->
     <div class="footer">
         <span class="brand">⚡ 哪吒探针</span>
         <span>·</span>
