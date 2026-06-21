@@ -11,66 +11,31 @@ import os
 from typing import Optional, List, Dict, Any
 
 import httpx
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.api.provider import Provider
-
-
-# 配置文件名
-CONFIG_FILE_NAME = "nezhatz_config.json"
 
 
 @register(
     "astrbot_plugin_nezhatz",
-    "NezhaTools",
+    "叹号大帝",
     "哪吒探针 - 查看哪吒监控站点服务器状态",
     "1.0.0",
-    "https://github.com/your-repo/astrbot_plugin_nezhatz"
+    "https://github.com/thTag/astrbot_plugin_nezhatz"
 )
 class NezhaPlugin(Star):
     """哪吒探针插件主类"""
 
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.config = self._load_config()
+        # 使用 AstrBot 标准配置
+        self.config = config
         self.base_url = self.config.get("base_url", "").rstrip("/")
         self.api_token = self.config.get("api_token", "")
-        self.admin_token = self.config.get("admin_token", "")  # 管理员token，用于部分接口
+        self.admin_token = self.config.get("admin_token", "")
         self.verify_ssl = self.config.get("verify_ssl", True)
-
-    def _load_config(self) -> Dict[str, Any]:
-        """加载配置文件"""
-        config_path = os.path.join("data", CONFIG_FILE_NAME)
-        default_config = {
-            "base_url": "http://your-dashboard-domain:8008",
-            "api_token": "your-api-token-here",
-            "admin_token": "",
-            "verify_ssl": True
-        }
         
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    config = json.load(f)
-                    # 合并默认配置，确保所有字段存在
-                    for key, value in default_config.items():
-                        if key not in config:
-                            config[key] = value
-                    return config
-            except Exception as e:
-                logger.error(f"加载哪吒配置失败: {e}")
-                return default_config
-        else:
-            # 创建默认配置文件
-            try:
-                os.makedirs("data", exist_ok=True)
-                with open(config_path, "w", encoding="utf-8") as f:
-                    json.dump(default_config, f, indent=4, ensure_ascii=False)
-                logger.info(f"已创建默认配置文件: {config_path}")
-            except Exception as e:
-                logger.error(f"创建默认配置文件失败: {e}")
-            return default_config
+        logger.info(f"哪吒探针插件已加载，面板地址: {self.base_url}")
 
     def _get_headers(self) -> Dict[str, str]:
         """获取请求头"""
@@ -96,11 +61,11 @@ class NezhaPlugin(Star):
             use_admin: 是否使用管理员token
             
         Returns:
-            解析后的JSON响应，失败时返回None
+            解析后的JSON响应，失败时返回包含error字段的字典
         """
         if not self.base_url:
             logger.error("未配置哪吒监控面板地址 (base_url)")
-            return None
+            return {"error": "未配置面板地址"}
             
         url = f"{self.base_url}{endpoint}"
         headers = self._get_headers()
@@ -120,7 +85,7 @@ class NezhaPlugin(Star):
                     response = await client.delete(url, headers=headers)
                 else:
                     logger.error(f"不支持的HTTP方法: {method}")
-                    return None
+                    return {"error": f"不支持的HTTP方法: {method}"}
                 
                 if response.status_code == 200:
                     return response.json()
@@ -219,19 +184,19 @@ class NezhaPlugin(Star):
         # 解析参数
         parts = event.message_str.strip().split()
         if len(parts) < 2:
-            # 默认显示列表
-            await self._handle_list(event)
+            # 默认显示列表 - 直接调用异步生成器，不加 await
+            yield from self._handle_list(event)
             return
         
         sub_cmd = parts[1].lower()
         
         if sub_cmd == "list":
-            await self._handle_list(event)
+            yield from self._handle_list(event)
         elif sub_cmd == "detail" and len(parts) >= 3:
             server_id = parts[2]
-            await self._handle_detail(event, server_id)
+            yield from self._handle_detail(event, server_id)
         elif sub_cmd == "status":
-            await self._handle_status(event)
+            yield from self._handle_status(event)
         else:
             yield event.plain_result(
                 "📖 **哪吒探针使用帮助**\n\n"
@@ -241,7 +206,7 @@ class NezhaPlugin(Star):
             )
 
     async def _handle_list(self, event: AstrMessageEvent):
-        """处理列出所有服务器"""
+        """处理列出所有服务器 - 异步生成器"""
         result = await self._make_request("GET", "/api/v1/servers")
         if result and "error" not in result:
             servers = result.get("servers", []) if isinstance(result, dict) else result
@@ -254,7 +219,7 @@ class NezhaPlugin(Star):
             yield event.plain_result(f"❌ 获取服务器列表失败: {error_msg}")
 
     async def _handle_detail(self, event: AstrMessageEvent, server_id: str):
-        """处理查看服务器详情"""
+        """处理查看服务器详情 - 异步生成器"""
         result = await self._make_request("GET", f"/api/v1/servers/{server_id}")
         if result and "error" not in result:
             server = result.get("server", {}) if isinstance(result, dict) else result
@@ -264,7 +229,7 @@ class NezhaPlugin(Star):
             yield event.plain_result(f"❌ 获取服务器详情失败: {error_msg}")
 
     async def _handle_status(self, event: AstrMessageEvent):
-        """处理查看状态概览"""
+        """处理查看状态概览 - 异步生成器"""
         result = await self._make_request("GET", "/api/v1/servers")
         if result and "error" not in result:
             servers = result.get("servers", []) if isinstance(result, dict) else result
@@ -273,7 +238,6 @@ class NezhaPlugin(Star):
                 online = sum(1 for s in servers if s.get("status") == "online")
                 offline = total - online
                 
-                # 计算平均负载
                 total_cpu = sum(s.get("cpu", 0) for s in servers)
                 total_mem = sum(s.get("memory", 0) for s in servers)
                 avg_cpu = total_cpu / total if total > 0 else 0
@@ -291,7 +255,6 @@ class NezhaPlugin(Star):
                     "",
                 ]
                 
-                # 列出所有服务器状态
                 lines.append("**服务器列表:**")
                 for svr in servers:
                     name = svr.get("name", "未命名")
@@ -427,11 +390,12 @@ class NezhaPlugin(Star):
             lines = [
                 f"⚙️ **服务器 {server_id} 配置**",
                 "",
-                f"🔹 **Agent密钥**: {config.get('secret', 'N/A')[:20]}..." if config.get('secret') else "",
-                f"🔹 **通知组**: {config.get('notification_group_id', '未配置')}",
-                f"🔹 **启用状态**: {'✅' if config.get('enabled') else '❌'}",
             ]
-            return "\n".join("\n".join(filter(None, lines)))
+            if config.get('secret'):
+                lines.append(f"🔹 **Agent密钥**: {config.get('secret')[:20]}...")
+            lines.append(f"🔹 **通知组**: {config.get('notification_group_id', '未配置')}")
+            lines.append(f"🔹 **启用状态**: {'✅' if config.get('enabled') else '❌'}")
+            return "\n".join(lines)
         error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
         return f"获取服务器配置失败: {error_msg}"
 
