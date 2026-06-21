@@ -30,7 +30,6 @@ class NezhaPlugin(Star):
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        # 使用 AstrBot 标准配置
         self.config = config
         self.base_url = self.config.get("base_url", "").rstrip("/")
         self.api_token = self.config.get("api_token", "")
@@ -40,7 +39,6 @@ class NezhaPlugin(Star):
         logger.info(f"哪吒探针插件已加载，面板地址: {self.base_url}")
 
     def _get_headers(self) -> Dict[str, str]:
-        """获取请求头"""
         headers = {"Content-Type": "application/json"}
         if self.api_token:
             headers["Authorization"] = f"Bearer {self.api_token}"
@@ -53,18 +51,6 @@ class NezhaPlugin(Star):
         data: Optional[Dict] = None,
         use_admin: bool = False
     ) -> Optional[Dict]:
-        """
-        发送HTTP请求到哪吒API
-        
-        Args:
-            method: HTTP方法 (GET, POST, PUT, DELETE)
-            endpoint: API端点 (如 /api/v1/servers)
-            data: 请求体数据 (可选)
-            use_admin: 是否使用管理员token
-            
-        Returns:
-            解析后的JSON响应，失败时返回包含error字段的字典
-        """
         if not self.base_url:
             logger.error("未配置哪吒监控面板地址 (base_url)")
             return {"error": "未配置面板地址"}
@@ -109,7 +95,6 @@ class NezhaPlugin(Star):
             return {"error": str(e)}
 
     def _format_server_list(self, servers: List[Dict]) -> str:
-        """格式化服务器列表输出"""
         if not servers:
             return "暂无服务器信息"
         
@@ -133,7 +118,6 @@ class NezhaPlugin(Star):
         return "\n".join(lines)
 
     def _format_server_detail(self, server: Dict) -> str:
-        """格式化服务器详细信息输出"""
         if not server:
             return "未找到服务器信息"
         
@@ -154,7 +138,6 @@ class NezhaPlugin(Star):
         lines.append(f"🔹 **出站流量**: {self._format_bytes(server.get('transfer_out', 0))}")
         lines.append(f"🔹 **运行时间**: {server.get('uptime', 'N/A')}")
         
-        # 负载信息
         load = server.get('load', {})
         if load:
             lines.append(f"🔹 **负载**: 1min={load.get('load1', 0)}, 5min={load.get('load5', 0)}, 15min={load.get('load15', 0)}")
@@ -162,7 +145,6 @@ class NezhaPlugin(Star):
         return "\n".join(lines)
 
     def _format_bytes(self, bytes_val: int) -> str:
-        """格式化字节大小"""
         if bytes_val < 1024:
             return f"{bytes_val} B"
         elif bytes_val < 1024 * 1024:
@@ -175,29 +157,33 @@ class NezhaPlugin(Star):
     # ==================== 指令处理器 ====================
 
     @filter.command("nezha")
-    def nezha_cmd(self, event: AstrMessageEvent):
+    async def nezha_cmd(self, event: AstrMessageEvent):
         """
         查看哪吒监控服务器状态
         用法: /nezha [list|detail <id>|status]
-        - /nezha list - 列出所有服务器
-        - /nezha detail <id> - 查看指定服务器详情
-        - /nezha status - 查看服务器状态概览
         """
         parts = event.message_str.strip().split()
+        
         if len(parts) < 2:
-            yield from self._handle_list(event)
+            # 默认显示列表
+            async for result in self._handle_list(event):
+                yield result
             return
         
         sub_cmd = parts[1].lower()
         
         if sub_cmd == "list":
-            yield from self._handle_list(event)
+            async for result in self._handle_list(event):
+                yield result
         elif sub_cmd == "detail" and len(parts) >= 3:
             server_id = parts[2]
-            yield from self._handle_detail(event, server_id)
+            async for result in self._handle_detail(event, server_id):
+                yield result
         elif sub_cmd == "status":
-            yield from self._handle_status(event)
+            async for result in self._handle_status(event):
+                yield result
         else:
+            # 帮助信息 - 使用 yield 返回，不要用 await
             yield event.plain_result(
                 "📖 **哪吒探针使用帮助**\n\n"
                 "`/nezha list` - 列出所有服务器\n"
@@ -277,7 +263,6 @@ class NezhaPlugin(Star):
         description="获取哪吒监控中所有服务器的列表和基本状态信息（名称、ID、状态、CPU、内存等）"
     )
     async def llm_list_servers(self) -> str:
-        """LLM Tools: 获取所有服务器列表"""
         result = await self._make_request("GET", "/api/v1/servers")
         if result and "error" not in result:
             servers = result.get("servers", []) if isinstance(result, dict) else result
@@ -292,7 +277,6 @@ class NezhaPlugin(Star):
         description="获取指定服务器的详细信息，包括CPU、内存、磁盘、流量、负载等。参数server_id为服务器ID"
     )
     async def llm_get_server_detail(self, server_id: str) -> str:
-        """LLM Tools: 获取服务器详细信息"""
         result = await self._make_request("GET", f"/api/v1/servers/{server_id}")
         if result and "error" not in result:
             server = result.get("server", {}) if isinstance(result, dict) else result
@@ -305,7 +289,6 @@ class NezhaPlugin(Star):
         description="获取服务器的实时数据，包括CPU、内存、磁盘、网络流量、连接数等详细指标。参数server_id为服务器ID"
     )
     async def llm_get_server_data(self, server_id: str) -> str:
-        """LLM Tools: 获取服务器实时数据"""
         result = await self._make_request("GET", f"/api/v1/servers/{server_id}/data")
         if result and "error" not in result:
             data = result.get("data", {}) if isinstance(result, dict) else result
@@ -330,7 +313,6 @@ class NezhaPlugin(Star):
         description="获取所有服务器的状态概览，包括总数量、在线数量、离线数量、平均CPU和内存使用率"
     )
     async def llm_server_status_summary(self) -> str:
-        """LLM Tools: 获取服务器状态概览"""
         result = await self._make_request("GET", "/api/v1/servers")
         if result and "error" not in result:
             servers = result.get("servers", []) if isinstance(result, dict) else result
@@ -360,7 +342,6 @@ class NezhaPlugin(Star):
         description="获取所有通知组列表和配置信息"
     )
     async def llm_get_notification_groups(self) -> str:
-        """LLM Tools: 获取通知组列表"""
         result = await self._make_request("GET", "/api/v1/notification")
         if result and "error" not in result:
             notifications = result.get("notifications", []) if isinstance(result, dict) else result
@@ -383,7 +364,6 @@ class NezhaPlugin(Star):
         description="获取指定服务器的配置信息，包括Agent配置、通知组等。参数server_id为服务器ID"
     )
     async def llm_get_server_config(self, server_id: str) -> str:
-        """LLM Tools: 获取服务器配置"""
         result = await self._make_request("GET", f"/api/v1/servers/{server_id}/config")
         if result and "error" not in result:
             config = result.get("config", {}) if isinstance(result, dict) else result
@@ -400,5 +380,4 @@ class NezhaPlugin(Star):
         return f"获取服务器配置失败: {error_msg}"
 
     async def terminate(self):
-        """插件卸载时清理"""
         logger.info("哪吒探针插件已卸载")
