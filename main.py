@@ -75,7 +75,7 @@ class NezhaPlugin(Star):
             diff = now - last_time
             return diff.total_seconds() < self.ONLINE_THRESHOLD_SECONDS
         except ImportError:
-            logger.warning("dateutil 未安装，使用简单时间判断")
+            logger.warning("dateutil 未安装，使用简单时间判断，建议安装 python-dateutil")
             return True
         except Exception as e:
             logger.debug(f"解析 last_active 失败: {e}")
@@ -199,7 +199,7 @@ class NezhaPlugin(Star):
                 "📖 **哪吒探针使用帮助**\n\n"
                 "`/nezha list` - 列出所有服务器\n"
                 "`/nezha detail <id>` - 查看服务器详情\n"
-                "`/nezha status` - 查看状态概览"
+                "`/nezha status` - 查看状态概览（图片）"
             )
 
     async def _handle_list(self, event: AstrMessageEvent):
@@ -208,7 +208,6 @@ class NezhaPlugin(Star):
         if result and "error" not in result:
             servers = result.get("data", []) if isinstance(result, dict) else result
             if isinstance(servers, list):
-                # 简单的文字列表
                 lines = ["📊 **服务器列表**", ""]
                 for svr in servers:
                     name = svr.get("name", "未命名")
@@ -310,7 +309,8 @@ class NezhaPlugin(Star):
                         "scale": "css"
                     }
                 )
-                yield event.image_result(image_url)
+                # 禁用 LLM 自动描述
+                yield event.image_result(image_url, extra={"disable_llm": True})
             else:
                 yield event.plain_result("❌ 获取状态失败：数据格式异常")
         else:
