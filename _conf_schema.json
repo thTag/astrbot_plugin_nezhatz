@@ -1,0 +1,26 @@
+{
+    "base_url": {
+        "type": "string",
+        "description": "哪吒监控面板访问地址",
+        "hint": "请填写完整的 URL，例如 https://nezha.example.com:8008 或 http://192.168.1.100:8008",
+        "default": ""
+    },
+    "api_token": {
+        "type": "string",
+        "description": "哪吒监控 API Token",
+        "hint": "在面板后台生成，用于 API 认证",
+        "default": ""
+    },
+    "admin_token": {
+        "type": "string",
+        "description": "管理员 Token (可选)",
+        "hint": "用于调用部分需要管理员权限的接口，非必填",
+        "default": ""
+    },
+    "verify_ssl": {
+        "type": "bool",
+        "description": "是否验证 SSL 证书",
+        "hint": "如果面板使用自签名证书且连接出错，可关闭验证",
+        "default": true
+    }
+}
