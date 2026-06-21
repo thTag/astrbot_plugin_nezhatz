@@ -149,6 +149,30 @@ class NezhaPlugin(Star):
         }
         return flags.get(country_code.lower(), "🌍")
 
+    def _get_os_icon(self, platform: str) -> str:
+        """根据操作系统返回 font-logos 图标类名"""
+        platform_lower = platform.lower()
+        if "ubuntu" in platform_lower:
+            return "fl-ubuntu"
+        elif "debian" in platform_lower:
+            return "fl-debian"
+        elif "centos" in platform_lower or "rhel" in platform_lower:
+            return "fl-centos"
+        elif "fedora" in platform_lower:
+            return "fl-fedora"
+        elif "alpine" in platform_lower:
+            return "fl-alpine"
+        elif "arch" in platform_lower:
+            return "fl-archlinux"
+        elif "opensuse" in platform_lower:
+            return "fl-opensuse"
+        elif "windows" in platform_lower:
+            return "fl-windows"
+        elif "mac" in platform_lower or "darwin" in platform_lower:
+            return "fl-macos"
+        else:
+            return ""
+
     def _format_bytes(self, bytes_val: int) -> str:
         if bytes_val < 1024:
             return f"{bytes_val} B"
@@ -278,6 +302,10 @@ class NezhaPlugin(Star):
                     mem_used = state.get("mem_used", 0)
                     mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
                     
+                    disk_total = host.get("disk_total", 0)
+                    disk_used = state.get("disk_used", 0)
+                    disk_percent = (disk_used / disk_total * 100) if disk_total > 0 else 0
+                    
                     geoip = svr.get("geoip", {})
                     country = geoip.get("country_code", "")
                     flag = self._get_country_flag(country)
@@ -287,6 +315,9 @@ class NezhaPlugin(Star):
                         "online": self._is_online(svr),
                         "cpu": state.get("cpu", 0),
                         "mem": mem_percent,
+                        "disk": disk_percent,
+                        "country_code": country.lower(),
+                        "os_icon": self._get_os_icon(host.get("platform", "")),
                         "flag": flag
                     })
                 
