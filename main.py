@@ -309,8 +309,8 @@ class NezhaPlugin(Star):
                         "scale": "css"
                     }
                 )
-                # 禁用 LLM 自动描述
-                yield event.image_result(image_url, extra={"disable_llm": True})
+                # 返回图片（当前版本不支持 extra 参数）
+                yield event.image_result(image_url)
             else:
                 yield event.plain_result("❌ 获取状态失败：数据格式异常")
         else:
