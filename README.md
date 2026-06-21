@@ -1,2 +1,106 @@
-# astrbot_plugin_nezhatz
-AstrBot 插件 - 哪吒探针
+哪吒探针插件 (astrbot_plugin_nezhatz)
+====================================
+
+作者：叹号大帝
+
+为 AstrBot 提供的哪吒监控面板查询插件，支持指令和 LLM Tools 调用。
+
+
+功能特性
+--------
+
+- 查看服务器列表 - 获取所有服务器的基本状态（名称、ID、IP、CPU、内存）
+- 查看服务器详情 - 查看指定服务器的完整信息（CPU、内存、磁盘、流量、负载等）
+- 状态概览 - 查看所有服务器的总体状态（在线/离线数量、平均负载）
+- LLM Tools 支持 - 可被 AstrBot 的 Agent 系统调用，实现智能问答
+- WebUI 配置 - 支持在 AstrBot 管理面板中可视化配置
+
+
+指令说明
+--------
+
+/nezha list      列出所有服务器
+/nezha detail 1  查看 ID 为 1 的服务器详情
+/nezha status    查看服务器状态概览
+
+
+输出示例
+--------
+
+📊 服务器列表
+
+🟢 主节点 (ID: 1)
+   IP: 192.168.1.100
+   CPU: 15.2%
+   内存: 42.8%
+
+🟢 备用节点 (ID: 2)
+   IP: 192.168.1.101
+   CPU: 8.5%
+   内存: 31.2%
+
+
+LLM Tools 列表
+--------------
+
+nezha_list_servers           获取所有服务器列表和状态
+nezha_get_server_detail      获取指定服务器详细信息
+nezha_get_server_data        获取服务器实时数据指标
+nezha_server_status_summary  获取服务器状态概览
+nezha_get_notification_groups 获取通知组列表
+nezha_get_server_config      获取服务器配置信息
+
+
+安装方法
+--------
+
+方法一：通过 AstrBot WebUI 安装（推荐）
+1. 打开 AstrBot 管理面板
+2. 进入「插件管理」->「插件市场」
+3. 搜索 astrbot_plugin_nezhatz
+4. 点击「安装」
+
+方法二：手动安装
+1. 进入 AstrBot 的 data/plugins 目录
+2. git clone https://github.com/thTag/astrbot_plugin_nezhatz.git
+3. 重启 AstrBot 或通过 WebUI 重载插件
+
+
+配置说明
+--------
+
+在 WebUI 中配置（「插件管理」->「哪吒探针」->「配置」）：
+
+base_url      哪吒监控面板地址，如 https://nezha.example.com:8008
+api_token     哪吒监控 API Token（在面板后台生成）
+admin_token   管理员 Token（可选，用于调用管理接口）
+verify_ssl    是否验证 SSL 证书（自签名证书可关闭）
+
+
+依赖
+----
+
+httpx >= 0.25.0（自动安装）
+
+
+文件结构
+--------
+
+astrbot_plugin_nezhatz/
+├── main.py               插件主文件
+├── _conf_schema.json     配置定义文件
+├── metadata.yaml         插件元数据
+├── requirements.txt      依赖列表
+└── README.md             本文档
+
+
+许可证
+------
+
+MIT License
+
+
+问题反馈
+--------
+
+如有问题请提交 Issue 或联系作者。
