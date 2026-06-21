@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/font-logos@1/assets/font-logos.css">
 <style>
-    /* 全局重置与暗色主题 */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
         width: 100%;
@@ -18,39 +17,39 @@
         display: flex;
         align-items: flex-start;
         justify-content: center;
-        padding: 20px;
+        padding: 30px;
     }
     .dashboard {
-        width: 860px;
+        width: 960px;
         max-width: 100%;
         background: #111111;
-        border-radius: 28px;
-        padding: 24px 28px 20px;
+        border-radius: 32px;
+        padding: 32px 36px 26px;
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
-    /* 头部 */
+    /* 头部 - 放大 */
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 22px;
+        margin-bottom: 30px;
         flex-wrap: wrap;
-        gap: 10px 16px;
+        gap: 14px 20px;
     }
     .header-left {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 16px;
     }
     .logo {
-        height: 36px;
+        height: 48px;
         width: auto;
         display: block;
     }
     .header h1 {
-        font-size: 24px;
+        font-size: 30px;
         font-weight: 700;
         background: linear-gradient(135deg, #ffffff 60%, #8888cc 100%);
         -webkit-background-clip: text;
@@ -59,42 +58,42 @@
     }
     .stats {
         display: flex;
-        gap: 12px;
+        gap: 18px;
         flex-wrap: wrap;
     }
     .stat-item {
-        background: rgba(255, 255, 255, 0.04);
-        padding: 4px 16px 4px 12px;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 8px 22px 8px 18px;
         border-radius: 40px;
-        font-size: 13px;
+        font-size: 16px;
         font-weight: 500;
         display: flex;
         align-items: center;
-        gap: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        gap: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
         color: #b0c4e0;
     }
-    .stat-item .num { font-weight: 700; color: #f0f4ff; margin-left: 2px; }
+    .stat-item .num { font-weight: 700; color: #f0f4ff; margin-left: 4px; }
     .stat-item .online-dot { color: #4ade80; }
     .stat-item .offline-dot { color: #f87171; }
 
-    /* 服务器卡片 - 单行布局 */
+    /* 服务器卡片 - 单行布局，放大 */
     .server-grid {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        margin-top: 2px;
+        gap: 10px;
+        margin-top: 4px;
     }
     .server-card {
         background: rgba(255, 255, 255, 0.025);
-        border-radius: 14px;
-        padding: 10px 18px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 16px;
+        padding: 14px 22px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
         display: flex;
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
-        gap: 8px 12px;
+        gap: 10px 16px;
         transition: opacity 0.2s;
     }
     .server-card.offline {
@@ -106,29 +105,57 @@
     .server-info {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 14px;
         flex-shrink: 0;
     }
     .flag-icon {
-        font-size: 20px;
+        font-size: 26px;
         line-height: 1;
-        width: 24px;
+        width: 32px;
         text-align: center;
     }
     .server-name {
-        font-size: 16px;
+        font-size: 20px;
         font-weight: 600;
         color: #f0f6ff;
         letter-spacing: -0.2px;
         white-space: nowrap;
     }
     .os-icon {
-        font-size: 18px;
+        font-size: 22px;
         opacity: 0.6;
-        margin-left: 2px;
+        margin-left: 4px;
     }
 
-    /* 中间：状态徽章 */
+    /* 中间：资源数值 */
+    .server-resources {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+    .resource-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 16px;
+        font-weight: 500;
+        color: #b0c4e0;
+    }
+    .resource-item .value {
+        font-weight: 600;
+        color: #e8edf5;
+        font-variant-numeric: tabular-nums;
+        min-width: 52px;
+        text-align: right;
+        font-size: 17px;
+    }
+    .resource-item .value.high { color: #fbbf24; }
+    .resource-item .value.critical { color: #f87171; }
+
+    /* 右侧：状态徽章 */
     .server-status {
         display: flex;
         align-items: center;
@@ -137,12 +164,12 @@
     .status-badge {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
+        gap: 8px;
         background: rgba(74, 222, 128, 0.12);
         color: #4ade80;
-        padding: 2px 12px 2px 8px;
+        padding: 6px 18px 6px 14px;
         border-radius: 40px;
-        font-size: 12px;
+        font-size: 15px;
         font-weight: 600;
         border: 1px solid rgba(74, 222, 128, 0.1);
     }
@@ -152,67 +179,45 @@
         border-color: rgba(248, 113, 113, 0.1);
     }
     .status-dot {
-        width: 7px;
-        height: 7px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
         background: #4ade80;
         display: inline-block;
-        box-shadow: 0 0 6px rgba(74, 222, 128, 0.2);
+        box-shadow: 0 0 10px rgba(74, 222, 128, 0.25);
     }
     .status-dot.offline {
         background: #f87171;
-        box-shadow: 0 0 6px rgba(248, 113, 113, 0.15);
+        box-shadow: 0 0 10px rgba(248, 113, 113, 0.2);
     }
-
-    /* 右侧：资源数值 */
-    .server-resources {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
-        flex-shrink: 0;
-    }
-    .resource-item {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 13px;
-        font-weight: 500;
-        color: #b0c4e0;
-    }
-    .resource-item .value {
-        font-weight: 600;
-        color: #e8edf5;
-        font-variant-numeric: tabular-nums;
-        min-width: 44px;
-        text-align: right;
-    }
-    .resource-item .value.high { color: #fbbf24; }
-    .resource-item .value.critical { color: #f87171; }
 
     /* 底部 */
     .footer {
-        margin-top: 20px;
-        padding-top: 14px;
-        border-top: 1px solid rgba(255, 255, 255, 0.04);
+        margin-top: 26px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
         display: flex;
         justify-content: flex-end;
-        font-size: 12px;
+        font-size: 14px;
         color: #4a5a7a;
-        gap: 8px;
+        gap: 10px;
     }
     .footer .brand { color: #6a7a9a; }
 
     /* 响应式 */
-    @media (max-width: 700px) {
-        body { padding: 12px; }
-        .dashboard { padding: 16px; border-radius: 20px; }
+    @media (max-width: 800px) {
+        body { padding: 16px; }
+        .dashboard { padding: 20px; border-radius: 24px; }
         .header { flex-direction: column; align-items: stretch; }
         .stats { justify-content: flex-start; }
-        .server-card { flex-wrap: wrap; gap: 6px 10px; }
-        .server-resources { flex-wrap: wrap; gap: 8px 14px; }
-        .logo { height: 30px; }
-        .header h1 { font-size: 20px; }
+        .server-card { flex-wrap: wrap; gap: 8px 14px; }
+        .server-resources { justify-content: flex-start; gap: 16px; }
+        .logo { height: 38px; }
+        .header h1 { font-size: 24px; }
+        .server-name { font-size: 17px; }
+        .resource-item { font-size: 14px; }
+        .resource-item .value { font-size: 15px; min-width: 44px; }
+        .status-badge { font-size: 13px; padding: 4px 14px 4px 10px; }
     }
 </style>
 </head>
@@ -221,14 +226,14 @@
     <!-- 头部 -->
     <div class="header">
         <div class="header-left">
-            <!-- 重新验证的 Base64 Logo -->
-            <img class="logo" src="data:image/png;base64,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" alt="哪吒监控" />
+            <!-- 从 GitHub 直接加载 Logo -->
+            <img class="logo" src="https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
             <h1>哪吒监控</h1>
         </div>
         <div class="stats">
             <span class="stat-item">🖥️ 总计 <span class="num">{{ total }}</span></span>
-            <span class="stat-item"><span class="online-dot">🟢</span> 在线 <span class="num">{{ online }}</span></span>
-            <span class="stat-item"><span class="offline-dot">🔴</span> 离线 <span class="num">{{ offline }}</span></span>
+            <span class="stat-item"><span class="online-dot">●</span> 在线 <span class="num">{{ online }}</span></span>
+            <span class="stat-item"><span class="offline-dot">●</span> 离线 <span class="num">{{ offline }}</span></span>
         </div>
     </div>
 
@@ -245,19 +250,19 @@
                 {% endif %}
             </div>
 
-            <!-- 中：状态徽章 -->
+            <!-- 中：资源数值 -->
+            <div class="server-resources">
+                <span class="resource-item">CPU <span class="value {% if server.cpu|default(0) > 70 %}high{% elif server.cpu|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.cpu|default(0)) }}%</span></span>
+                <span class="resource-item">内存 <span class="value {% if server.mem|default(0) > 70 %}high{% elif server.mem|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.mem|default(0)) }}%</span></span>
+                <span class="resource-item">磁盘 <span class="value {% if server.disk|default(0) > 70 %}high{% elif server.disk|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.disk|default(0)) }}%</span></span>
+            </div>
+
+            <!-- 右：状态徽章 -->
             <div class="server-status">
                 <span class="status-badge {% if not server.online %}offline{% endif %}">
                     <span class="status-dot {% if not server.online %}offline{% endif %}"></span>
                     {{ '在线' if server.online else '离线' }}
                 </span>
-            </div>
-
-            <!-- 右：资源数值 -->
-            <div class="server-resources">
-                <span class="resource-item">💻 <span class="value {% if server.cpu|default(0) > 70 %}high{% elif server.cpu|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.cpu|default(0)) }}%</span></span>
-                <span class="resource-item">🧠 <span class="value {% if server.mem|default(0) > 70 %}high{% elif server.mem|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.mem|default(0)) }}%</span></span>
-                <span class="resource-item">💾 <span class="value {% if server.disk|default(0) > 70 %}high{% elif server.disk|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.disk|default(0)) }}%</span></span>
             </div>
         </div>
         {% endfor %}
