@@ -4,6 +4,8 @@
 用于查看哪吒监控站点的服务器状态等信息
 支持指令与LLM Tools调用
 基于哪吒监控 2.2.6 版本 API
+
+作者: 叹号大帝
 """
 
 import json
@@ -173,7 +175,7 @@ class NezhaPlugin(Star):
     # ==================== 指令处理器 ====================
 
     @filter.command("nezha")
-    async def nezha_cmd(self, event: AstrMessageEvent):
+    def nezha_cmd(self, event: AstrMessageEvent):
         """
         查看哪吒监控服务器状态
         用法: /nezha [list|detail <id>|status]
@@ -181,10 +183,8 @@ class NezhaPlugin(Star):
         - /nezha detail <id> - 查看指定服务器详情
         - /nezha status - 查看服务器状态概览
         """
-        # 解析参数
         parts = event.message_str.strip().split()
         if len(parts) < 2:
-            # 默认显示列表 - 直接调用异步生成器，不加 await
             yield from self._handle_list(event)
             return
         
