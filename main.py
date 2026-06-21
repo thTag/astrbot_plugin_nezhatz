@@ -106,12 +106,10 @@ class NezhaPlugin(Star):
             server_id = svr.get("id", "?")
             status = svr.get("status", "unknown")
             status_icon = "🟢" if status == "online" else "🔴"
-            ip = svr.get("ip", "N/A")
             cpu = svr.get("cpu", 0)
             mem = svr.get("memory", 0)
             
             lines.append(f"{status_icon} **{name}** (ID: {server_id})")
-            lines.append(f"   IP: {ip}")
             lines.append(f"   CPU: {cpu}%")
             lines.append(f"   内存: {mem}%")
             lines.append("")
@@ -130,7 +128,6 @@ class NezhaPlugin(Star):
         lines.append(f"🔹 **名称**: {server.get('name', 'N/A')}")
         lines.append(f"🔹 **ID**: {server.get('id', 'N/A')}")
         lines.append(f"🔹 **状态**: {'🟢 在线' if server.get('status') == 'online' else '🔴 离线'}")
-        lines.append(f"🔹 **IP地址**: {server.get('ip', 'N/A')}")
         lines.append(f"🔹 **操作系统**: {server.get('os', 'N/A')}")
         lines.append(f"🔹 **CPU**: {server.get('cpu', 0)}%")
         lines.append(f"🔹 **内存**: {server.get('memory', 0)}%")
@@ -192,10 +189,8 @@ class NezhaPlugin(Star):
 
     async def _handle_list(self, event: AstrMessageEvent):
         """处理列出所有服务器 - 异步生成器"""
-        # 修正：/api/v1/server
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
-            # 返回格式: {"success": true, "data": [...]}
             servers = result.get("data", []) if isinstance(result, dict) else result
             if isinstance(servers, list):
                 yield event.plain_result(self._format_server_list(servers))
@@ -207,7 +202,6 @@ class NezhaPlugin(Star):
 
     async def _handle_detail(self, event: AstrMessageEvent, server_id: str):
         """处理查看服务器详情 - 异步生成器"""
-        # 修正：/api/v1/server/{id}
         result = await self._make_request("GET", f"/api/v1/server/{server_id}")
         if result and "error" not in result:
             server = result.get("data", {}) if isinstance(result, dict) else result
@@ -218,7 +212,6 @@ class NezhaPlugin(Star):
 
     async def _handle_status(self, event: AstrMessageEvent):
         """处理查看状态概览 - 异步生成器"""
-        # 修正：/api/v1/server
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
             servers = result.get("data", []) if isinstance(result, dict) else result
@@ -266,7 +259,6 @@ class NezhaPlugin(Star):
         description="获取哪吒监控中所有服务器的列表和基本状态信息（名称、ID、状态、CPU、内存等）"
     )
     async def llm_list_servers(self) -> str:
-        # 修正：/api/v1/server
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
             servers = result.get("data", []) if isinstance(result, dict) else result
@@ -281,7 +273,6 @@ class NezhaPlugin(Star):
         description="获取指定服务器的详细信息，包括CPU、内存、磁盘、流量、负载等。参数server_id为服务器ID"
     )
     async def llm_get_server_detail(self, server_id: str) -> str:
-        # 修正：/api/v1/server/{id}
         result = await self._make_request("GET", f"/api/v1/server/{server_id}")
         if result and "error" not in result:
             server = result.get("data", {}) if isinstance(result, dict) else result
@@ -294,18 +285,15 @@ class NezhaPlugin(Star):
         description="获取服务器的实时数据，包括CPU、内存、磁盘、网络流量、连接数等详细指标。参数server_id为服务器ID"
     )
     async def llm_get_server_data(self, server_id: str) -> str:
-        # 修正：使用 /api/v1/server/{id}/metrics 接口
         metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "udp_conn", "process_count"]
         result_data = {}
         
         for metric in metrics:
-            # 注意：实际路径是 /api/v1/server/{id}/metrics?metric=cpu
             result = await self._make_request("GET", f"/api/v1/server/{server_id}/metrics?metric={metric}")
             if result and "error" not in result:
                 data = result.get("data", {})
                 points = data.get("data_points", [])
                 if points:
-                    # 取最新的数据点
                     result_data[metric] = points[-1].get("value", 0)
                 else:
                     result_data[metric] = 0
@@ -331,7 +319,6 @@ class NezhaPlugin(Star):
         description="获取所有服务器的状态概览，包括总数量、在线数量、离线数量、平均CPU和内存使用率"
     )
     async def llm_server_status_summary(self) -> str:
-        # 修正：/api/v1/server
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
             servers = result.get("data", []) if isinstance(result, dict) else result
@@ -361,7 +348,6 @@ class NezhaPlugin(Star):
         description="获取所有通知组列表和配置信息"
     )
     async def llm_get_notification_groups(self) -> str:
-        # 修正：/api/v1/notification-group
         result = await self._make_request("GET", "/api/v1/notification-group")
         if result and "error" not in result:
             notifications = result.get("data", []) if isinstance(result, dict) else result
@@ -384,7 +370,6 @@ class NezhaPlugin(Star):
         description="获取指定服务器的配置信息，包括Agent配置、通知组等。参数server_id为服务器ID"
     )
     async def llm_get_server_config(self, server_id: str) -> str:
-        # 修正：/api/v1/server/config/{id}
         result = await self._make_request("GET", f"/api/v1/server/config/{server_id}")
         if result and "error" not in result:
             config = result.get("data", {}) if isinstance(result, dict) else result
