@@ -4,15 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>哪吒监控</title>
-<!-- flag-icons 和 font-logos CDN -->
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/font-logos@1/assets/font-logos.css">
 <style>
-    * { 
-        margin: 0; 
-        padding: 0; 
-        box-sizing: border-box; 
-    }
+    /* 全局重置与暗色主题 */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
         width: 100%;
         min-height: 100vh;
@@ -22,43 +18,40 @@
         display: flex;
         align-items: flex-start;
         justify-content: center;
-        padding: 24px;
+        padding: 20px;
     }
-
     .dashboard {
-        width: 820px;
+        width: 860px;
         max-width: 100%;
         background: #111111;
-        border-radius: 32px;
-        padding: 28px 30px 22px;
+        border-radius: 28px;
+        padding: 24px 28px 20px;
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.04);
     }
 
+    /* 头部 */
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 28px;
+        margin-bottom: 22px;
         flex-wrap: wrap;
-        gap: 12px 16px;
+        gap: 10px 16px;
     }
     .header-left {
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
     }
     .logo {
-        height: 40px;
+        height: 36px;
         width: auto;
         display: block;
-        border-radius: 8px;
     }
     .header h1 {
-        font-size: 26px;
+        font-size: 24px;
         font-weight: 700;
-        color: #ffffff;
-        letter-spacing: 0.5px;
         background: linear-gradient(135deg, #ffffff 60%, #8888cc 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -66,90 +59,90 @@
     }
     .stats {
         display: flex;
-        gap: 14px;
+        gap: 12px;
         flex-wrap: wrap;
     }
     .stat-item {
         background: rgba(255, 255, 255, 0.04);
-        padding: 6px 18px 6px 14px;
+        padding: 4px 16px 4px 12px;
         border-radius: 40px;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         border: 1px solid rgba(255, 255, 255, 0.04);
         color: #b0c4e0;
     }
-    .stat-item .num {
-        font-weight: 700;
-        color: #f0f4ff;
-        margin-left: 2px;
-    }
+    .stat-item .num { font-weight: 700; color: #f0f4ff; margin-left: 2px; }
     .stat-item .online-dot { color: #4ade80; }
     .stat-item .offline-dot { color: #f87171; }
 
+    /* 服务器卡片 - 单行布局 */
     .server-grid {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        margin-top: 4px;
+        gap: 8px;
+        margin-top: 2px;
     }
-
     .server-card {
         background: rgba(255, 255, 255, 0.025);
-        border-radius: 20px;
-        padding: 16px 20px 14px 20px;
+        border-radius: 14px;
+        padding: 10px 18px;
         border: 1px solid rgba(255, 255, 255, 0.04);
         display: flex;
-        flex-direction: column;
-        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        transition: opacity 0.2s;
     }
     .server-card.offline {
         opacity: 0.55;
         border-color: rgba(255, 100, 100, 0.1);
     }
 
-    .card-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px 12px;
-    }
-    .server-name-group {
+    /* 左侧：国旗 + 名称 + 系统图标 */
+    .server-info {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
+        flex-shrink: 0;
     }
     .flag-icon {
-        font-size: 22px;
+        font-size: 20px;
         line-height: 1;
-        width: 28px;
+        width: 24px;
         text-align: center;
     }
     .server-name {
-        font-size: 17px;
+        font-size: 16px;
         font-weight: 600;
         color: #f0f6ff;
         letter-spacing: -0.2px;
+        white-space: nowrap;
     }
+    .os-icon {
+        font-size: 18px;
+        opacity: 0.6;
+        margin-left: 2px;
+    }
+
+    /* 中间：状态徽章 */
     .server-status {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 14px;
-        font-weight: 500;
+        flex-shrink: 0;
     }
     .status-badge {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         background: rgba(74, 222, 128, 0.12);
         color: #4ade80;
-        padding: 3px 14px 3px 10px;
+        padding: 2px 12px 2px 8px;
         border-radius: 40px;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
         border: 1px solid rgba(74, 222, 128, 0.1);
     }
@@ -159,90 +152,77 @@
         border-color: rgba(248, 113, 113, 0.1);
     }
     .status-dot {
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
         background: #4ade80;
         display: inline-block;
-        box-shadow: 0 0 8px rgba(74, 222, 128, 0.2);
+        box-shadow: 0 0 6px rgba(74, 222, 128, 0.2);
     }
     .status-dot.offline {
         background: #f87171;
-        box-shadow: 0 0 8px rgba(248, 113, 113, 0.15);
-    }
-    .os-icon {
-        font-size: 20px;
-        opacity: 0.6;
-        margin-left: 2px;
+        box-shadow: 0 0 6px rgba(248, 113, 113, 0.15);
     }
 
-    /* 资源行：只显示数值，无进度条 */
-    .resource-row {
+    /* 右侧：资源数值 */
+    .server-resources {
         display: flex;
+        align-items: center;
+        gap: 14px;
         flex-wrap: wrap;
-        gap: 14px 28px;
-        padding-top: 2px;
+        flex-shrink: 0;
     }
     .resource-item {
         display: flex;
         align-items: center;
-        gap: 8px;
-        flex: 1 0 auto;
-        min-width: 120px;
-    }
-    .resource-label {
+        gap: 4px;
         font-size: 13px;
         font-weight: 500;
-        color: #8899bb;
-        width: 44px;
-        flex-shrink: 0;
+        color: #b0c4e0;
     }
-    .resource-value {
-        font-size: 15px;
+    .resource-item .value {
         font-weight: 600;
-        color: #c8d8f0;
+        color: #e8edf5;
         font-variant-numeric: tabular-nums;
+        min-width: 44px;
+        text-align: right;
     }
-    .resource-value.high {
-        color: #fbbf24;
-    }
-    .resource-value.critical {
-        color: #f87171;
-    }
+    .resource-item .value.high { color: #fbbf24; }
+    .resource-item .value.critical { color: #f87171; }
 
+    /* 底部 */
     .footer {
-        margin-top: 24px;
-        padding-top: 16px;
+        margin-top: 20px;
+        padding-top: 14px;
         border-top: 1px solid rgba(255, 255, 255, 0.04);
         display: flex;
         justify-content: flex-end;
         font-size: 12px;
         color: #4a5a7a;
-        letter-spacing: 0.3px;
-        align-items: center;
-        gap: 10px;
+        gap: 8px;
     }
-    .footer .brand {
-        color: #6a7a9a;
-    }
+    .footer .brand { color: #6a7a9a; }
 
-    @media (max-width: 600px) {
+    /* 响应式 */
+    @media (max-width: 700px) {
         body { padding: 12px; }
-        .dashboard { padding: 18px; border-radius: 20px; }
+        .dashboard { padding: 16px; border-radius: 20px; }
         .header { flex-direction: column; align-items: stretch; }
         .stats { justify-content: flex-start; }
-        .resource-row { flex-direction: column; gap: 6px; }
-        .resource-item { min-width: unset; }
-        .logo { height: 32px; }
+        .server-card { flex-wrap: wrap; gap: 6px 10px; }
+        .server-resources { flex-wrap: wrap; gap: 8px 14px; }
+        .logo { height: 30px; }
         .header h1 { font-size: 20px; }
     }
 </style>
 </head>
 <body>
 <div class="dashboard">
+    <!-- 头部 -->
     <div class="header">
         <div class="header-left">
-            <img class="logo" src="data:image/png;base64,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" alt="哪吒监控" />
+            <!-- 重新验证的 Base64 Logo -->
+            <img class="logo" src="data:image/png;base64,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" alt="哪吒监控" />
             <h1>哪吒监控</h1>
         </div>
         <div class="stats">
@@ -252,48 +232,38 @@
         </div>
     </div>
 
+    <!-- 服务器列表 - 单行布局 -->
     <div class="server-grid">
         {% for server in servers %}
         <div class="server-card {% if not server.online %}offline{% endif %}">
-            <div class="card-row">
-                <div class="server-name-group">
-                    <span class="flag-icon fi fi-{{ server.country_code|lower }}"></span>
-                    <span class="server-name">{{ server.name }}</span>
-                    {% if server.os_icon %}
-                    <span class="os-icon {{ server.os_icon }}"></span>
-                    {% endif %}
-                </div>
-                <div class="server-status">
-                    <span class="status-badge {% if not server.online %}offline{% endif %}">
-                        <span class="status-dot {% if not server.online %}offline{% endif %}"></span>
-                        {{ '在线' if server.online else '离线' }}
-                    </span>
-                </div>
+            <!-- 左：国旗 + 名称 + 系统图标 -->
+            <div class="server-info">
+                <span class="flag-icon fi fi-{{ server.country_code|lower }}"></span>
+                <span class="server-name">{{ server.name }}</span>
+                {% if server.os_icon %}
+                <span class="os-icon {{ server.os_icon }}"></span>
+                {% endif %}
             </div>
-            <div class="resource-row">
-                <div class="resource-item">
-                    <span class="resource-label">💻 CPU</span>
-                    <span class="resource-value {% if server.cpu|default(0) > 70 %}high{% elif server.cpu|default(0) > 90 %}critical{% endif %}">
-                        {{ '%.1f'|format(server.cpu|default(0)) }}%
-                    </span>
-                </div>
-                <div class="resource-item">
-                    <span class="resource-label">🧠 内存</span>
-                    <span class="resource-value {% if server.mem|default(0) > 70 %}high{% elif server.mem|default(0) > 90 %}critical{% endif %}">
-                        {{ '%.1f'|format(server.mem|default(0)) }}%
-                    </span>
-                </div>
-                <div class="resource-item">
-                    <span class="resource-label">💾 磁盘</span>
-                    <span class="resource-value {% if server.disk|default(0) > 70 %}high{% elif server.disk|default(0) > 90 %}critical{% endif %}">
-                        {{ '%.1f'|format(server.disk|default(0)) }}%
-                    </span>
-                </div>
+
+            <!-- 中：状态徽章 -->
+            <div class="server-status">
+                <span class="status-badge {% if not server.online %}offline{% endif %}">
+                    <span class="status-dot {% if not server.online %}offline{% endif %}"></span>
+                    {{ '在线' if server.online else '离线' }}
+                </span>
+            </div>
+
+            <!-- 右：资源数值 -->
+            <div class="server-resources">
+                <span class="resource-item">💻 <span class="value {% if server.cpu|default(0) > 70 %}high{% elif server.cpu|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.cpu|default(0)) }}%</span></span>
+                <span class="resource-item">🧠 <span class="value {% if server.mem|default(0) > 70 %}high{% elif server.mem|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.mem|default(0)) }}%</span></span>
+                <span class="resource-item">💾 <span class="value {% if server.disk|default(0) > 70 %}high{% elif server.disk|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.disk|default(0)) }}%</span></span>
             </div>
         </div>
         {% endfor %}
     </div>
 
+    <!-- 底部 -->
     <div class="footer">
         <span class="brand">⚡ 哪吒探针</span>
         <span>·</span>
