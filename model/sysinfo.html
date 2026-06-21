@@ -293,23 +293,23 @@
                 <div class="resource-item">
                     <span class="resource-label">💻 CPU</span>
                     <span class="resource-bar-wrap">
-                        <span class="resource-bar-fill {% if server.cpu > 70 %}orange{% elif server.cpu > 90 %}red{% endif %}" style="width: {{ '%.0f'|format(server.cpu) }}%;"></span>
+                        <span class="resource-bar-fill {% if server.cpu|default(0) > 70 %}orange{% elif server.cpu|default(0) > 90 %}red{% endif %}" style="width: {{ server.cpu|default(0)|round(0)|int }}%;"></span>
                     </span>
-                    <span class="resource-value">{{ '%.1f'|format(server.cpu) }}%</span>
+                    <span class="resource-value">{{ '%.1f'|format(server.cpu|default(0)) }}%</span>
                 </div>
                 <div class="resource-item">
                     <span class="resource-label">🧠 内存</span>
                     <span class="resource-bar-wrap">
-                        <span class="resource-bar-fill {% if server.mem > 70 %}orange{% elif server.mem > 90 %}red{% endif %}" style="width: {{ '%.0f'|format(server.mem) }}%;"></span>
+                        <span class="resource-bar-fill {% if server.mem|default(0) > 70 %}orange{% elif server.mem|default(0) > 90 %}red{% endif %}" style="width: {{ server.mem|default(0)|round(0)|int }}%;"></span>
                     </span>
-                    <span class="resource-value">{{ '%.1f'|format(server.mem) }}%</span>
+                    <span class="resource-value">{{ '%.1f'|format(server.mem|default(0)) }}%</span>
                 </div>
                 <div class="resource-item">
                     <span class="resource-label">💾 磁盘</span>
                     <span class="resource-bar-wrap">
-                        <span class="resource-bar-fill {% if server.disk > 70 %}orange{% elif server.disk > 90 %}red{% endif %}" style="width: {{ '%.0f'|format(server.disk) }}%;"></span>
+                        <span class="resource-bar-fill {% if server.disk|default(0) > 70 %}orange{% elif server.disk|default(0) > 90 %}red{% endif %}" style="width: {{ server.disk|default(0)|round(0)|int }}%;"></span>
                     </span>
-                    <span class="resource-value">{{ '%.1f'|format(server.disk) }}%</span>
+                    <span class="resource-value">{{ '%.1f'|format(server.disk|default(0)) }}%</span>
                 </div>
             </div>
         </div>
