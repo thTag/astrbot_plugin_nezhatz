@@ -11,6 +11,7 @@
 import json
 import os
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
 
 import httpx
 from astrbot.api import logger, AstrBotConfig
@@ -28,6 +29,9 @@ from astrbot.api.star import Context, Star, register
 class NezhaPlugin(Star):
     """哪吒探针插件主类"""
 
+    # 在线判断阈值：5分钟内有活动视为在线
+    ONLINE_THRESHOLD_SECONDS = 300
+
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
@@ -43,6 +47,33 @@ class NezhaPlugin(Star):
         if self.api_token:
             headers["Authorization"] = f"Bearer {self.api_token}"
         return headers
+
+    def _is_online(self, server: Dict) -> bool:
+        """
+        判断服务器是否在线。
+        基于 last_active 字段，如果最后活动时间在阈值内，视为在线。
+        """
+        last_active_str = server.get("last_active")
+        if not last_active_str:
+            return False
+        
+        try:
+            # 尝试解析 ISO 8601 格式的时间字符串
+            # 处理可能的时区格式，如 +08:00 或 Z
+            from dateutil import parser
+            last_time = parser.parse(last_active_str)
+            # 获取当前时间，赋予与 last_time 相同的时区信息
+            now = datetime.now(last_time.tzinfo)
+            diff = now - last_time
+            return diff.total_seconds() < self.ONLINE_THRESHOLD_SECONDS
+        except ImportError:
+            # 如果没有 dateutil，使用简单的字符串判断
+            # 这是一个后备方案，不够精确但可以工作
+            logger.warning("dateutil 未安装，使用简单时间判断，建议安装 python-dateutil")
+            return True  # 保守起见，有值就认为在线
+        except Exception as e:
+            logger.debug(f"解析 last_active 失败: {e}, 原始值: {last_active_str}")
+            return False
 
     async def _make_request(
         self, 
@@ -106,8 +137,9 @@ class NezhaPlugin(Star):
         for svr in servers:
             name = svr.get("name", "未命名")
             server_id = svr.get("id", "?")
-            status = svr.get("status", "unknown")
-            status_icon = "🟢" if status == "online" else "🔴"
+            is_online = self._is_online(svr)
+            status_icon = "🟢" if is_online else "🔴"
+            status_text = "在线" if is_online else "离线"
             
             state = svr.get("state", {})
             host = svr.get("host", {})
@@ -122,7 +154,7 @@ class NezhaPlugin(Star):
             flag = self._get_country_flag(country)
             
             lines.append(f"{flag} **{name}**")
-            lines.append(f"   {status_icon} 在线" if status == "online" else f"   {status_icon} 离线")
+            lines.append(f"   {status_icon} {status_text}")
             lines.append(f"   💻 CPU: {cpu:.1f}%")
             lines.append(f"   🧠 内存: {mem_percent:.1f}%")
             lines.append("")
@@ -142,6 +174,10 @@ class NezhaPlugin(Star):
         geoip = server.get("geoip", {})
         ip_info = geoip.get("ip", {})
         
+        is_online = self._is_online(server)
+        status_icon = "🟢" if is_online else "🔴"
+        status_text = "在线" if is_online else "离线"
+        
         # 获取 CPU 信息
         cpu_model = host.get("cpu", [])
         if cpu_model and isinstance(cpu_model, list):
@@ -156,13 +192,12 @@ class NezhaPlugin(Star):
         lines.append("")
         lines.append(f"{flag} **名称**: {server.get('name', 'N/A')}")
         lines.append(f"   🆔 ID: {server.get('id', 'N/A')}")
-        lines.append(f"   {'🟢 在线' if server.get('status') == 'online' else '🔴 离线'}")
+        lines.append(f"   {status_icon} {status_text}")
         lines.append("")
         lines.append("--- **系统信息** ---")
         lines.append(f"   🐧 系统: {host.get('platform', 'N/A')} {host.get('platform_version', '')}")
         lines.append(f"   🏗️ 架构: {host.get('arch', 'N/A')}")
         lines.append(f"   💻 CPU: {cpu_model}")
-        lines.append(f"   📦 核心: {len(cpu_model) if isinstance(cpu_model, list) else 'N/A'} 核心")
         lines.append("")
         lines.append("--- **资源使用** ---")
         lines.append(f"   📈 CPU: {state.get('cpu', 0):.1f}%")
@@ -191,7 +226,7 @@ class NezhaPlugin(Star):
             return "📭 暂无服务器数据"
         
         total = len(servers)
-        online = sum(1 for s in servers if s.get("status") == "online")
+        online = sum(1 for s in servers if self._is_online(s))
         offline = total - online
         
         total_cpu = 0
@@ -236,7 +271,8 @@ class NezhaPlugin(Star):
         
         for svr in servers:
             name = svr.get("name", "未命名")
-            status_icon = "🟢" if svr.get("status") == "online" else "🔴"
+            is_online = self._is_online(svr)
+            status_icon = "🟢" if is_online else "🔴"
             state = svr.get("state", {})
             cpu = state.get("cpu", 0)
             
@@ -261,7 +297,7 @@ class NezhaPlugin(Star):
             "za": "🇿🇦", "eg": "🇪🇬", "ng": "🇳🇬", "ke": "🇰🇪",
             "tw": "🇹🇼", "mo": "🇲🇴", "my": "🇲🇾", "th": "🇹🇭",
             "vn": "🇻🇳", "ph": "🇵🇭", "id": "🇮🇩", "pk": "🇵🇰",
-            "bd": "🇧🇩", "ru": "🇷🇺", "kz": "🇰🇿", "uz": "🇺🇿"
+            "bd": "🇧🇩", "kz": "🇰🇿", "uz": "🇺🇿"
         }
         return flags.get(country_code.lower(), "🌍")
 
