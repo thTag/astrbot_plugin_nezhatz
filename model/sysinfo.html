@@ -1,163 +1,333 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>哪吒监控</title>
+<!-- 使用 flag-icons 和 font-logos 的 CDN 样式 -->
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/font-logos@1/assets/font-logos.css">
 <style>
+    /* 全局重置与暗色主题 */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        background: #0f1117;
+        background: #0b0d12;
+        color: #e8edf5;
         padding: 30px;
-        color: #e4e6eb;
-        width: 700px;
+        width: 820px;
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
     }
-    .container {
-        background: #1a1d27;
-        border-radius: 16px;
-        padding: 28px 30px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+
+    .dashboard {
+        width: 100%;
+        max-width: 780px;
+        background: #151a24;
+        border-radius: 28px;
+        padding: 30px 28px 24px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.04);
     }
+
+    /* 顶部标题与统计 */
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid #2a2d3a;
-        padding-bottom: 16px;
-        margin-bottom: 20px;
+        margin-bottom: 26px;
+        flex-wrap: wrap;
+        gap: 12px;
     }
-    .header h1 {
-        font-size: 24px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .stats {
-        display: flex;
-        gap: 20px;
-        font-size: 14px;
-    }
-    .stats span {
-        background: #252a38;
-        padding: 4px 14px;
-        border-radius: 20px;
-        color: #b0b8c8;
-    }
-    .stats .online { color: #4ade80; }
-    .stats .offline { color: #f87171; }
-    .server-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .server-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: #222733;
-        padding: 12px 18px;
-        border-radius: 10px;
-        transition: all 0.2s;
-        border-left: 4px solid #4ade80;
-    }
-    .server-item.offline {
-        border-left-color: #f87171;
-        opacity: 0.7;
-    }
-    .server-info {
+    .header-left {
         display: flex;
         align-items: center;
         gap: 12px;
     }
-    .server-info .flag {
-        font-size: 20px;
+    .logo-icon {
+        font-size: 28px;
+        line-height: 1;
     }
-    .server-info .name {
+    .header h1 {
+        font-size: 24px;
         font-weight: 600;
-        font-size: 16px;
-        color: #e4e6eb;
+        background: linear-gradient(135deg, #f0f4ff 0%, #a0b8e0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.3px;
     }
-    .server-info .status-badge {
-        font-size: 12px;
-        padding: 2px 10px;
-        border-radius: 12px;
-        background: #1a3a2a;
-        color: #4ade80;
-    }
-    .server-info .status-badge.offline {
-        background: #3a1a1a;
-        color: #f87171;
-    }
-    .server-resources {
+    .stats {
         display: flex;
-        gap: 20px;
-        font-size: 13px;
-        color: #9aa2b8;
+        gap: 16px;
+        flex-wrap: wrap;
     }
-    .server-resources span {
+    .stat-item {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(4px);
+        padding: 6px 16px 6px 14px;
+        border-radius: 40px;
+        font-size: 14px;
+        font-weight: 500;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: #b6c8e0;
     }
-    .server-resources .cpu-bar, .server-resources .mem-bar {
-        display: inline-block;
-        width: 60px;
-        height: 6px;
-        background: #2a2d3a;
+    .stat-item .num {
+        font-weight: 700;
+        color: #f0f4ff;
+        margin-left: 2px;
+    }
+    .stat-item .online-dot { color: #4ade80; }
+    .stat-item .offline-dot { color: #f87171; }
+
+    /* 服务器网格 */
+    .server-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 6px;
+    }
+
+    /* 服务器卡片 */
+    .server-card {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 18px;
+        padding: 16px 20px 14px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.15s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .server-card.offline {
+        opacity: 0.6;
+        border-color: rgba(255, 100, 100, 0.15);
+    }
+
+    /* 卡片第一行：名称 + 状态 + 图标 */
+    .card-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+    }
+    .server-name-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .flag-icon {
+        font-size: 22px;
+        line-height: 1;
         border-radius: 4px;
-        overflow: hidden;
+        width: 28px;
+        text-align: center;
+    }
+    .server-name {
+        font-size: 17px;
+        font-weight: 600;
+        color: #eef3fc;
+        letter-spacing: -0.2px;
+    }
+    .server-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(74, 222, 128, 0.15);
+        color: #4ade80;
+        padding: 3px 14px 3px 10px;
+        border-radius: 40px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1px solid rgba(74, 222, 128, 0.15);
+    }
+    .status-badge.offline {
+        background: rgba(248, 113, 113, 0.12);
+        color: #f87171;
+        border-color: rgba(248, 113, 113, 0.15);
+    }
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4ade80;
+        display: inline-block;
+        box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+    }
+    .status-dot.offline {
+        background: #f87171;
+        box-shadow: 0 0 6px rgba(248, 113, 113, 0.2);
+    }
+
+    .os-icon {
+        font-size: 20px;
+        opacity: 0.7;
         margin-left: 4px;
     }
-    .server-resources .cpu-bar .fill, .server-resources .mem-bar .fill {
-        height: 100%;
-        border-radius: 4px;
-        background: linear-gradient(90deg, #4ade80, #22d3ee);
+
+    /* 卡片第二行：资源进度条 */
+    .resource-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 28px;
+        padding-top: 4px;
     }
-    .footer {
-        margin-top: 16px;
-        padding-top: 14px;
-        border-top: 1px solid #2a2d3a;
-        font-size: 12px;
-        color: #6b7280;
+    .resource-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1 0 auto;
+        min-width: 140px;
+    }
+    .resource-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #9aafcf;
+        width: 48px;
+        flex-shrink: 0;
+    }
+    .resource-bar-wrap {
+        flex: 1;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        overflow: hidden;
+        min-width: 60px;
+    }
+    .resource-bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        background: linear-gradient(90deg, #4ade80, #22d3ee);
+        transition: width 0.2s ease;
+    }
+    .resource-bar-fill.orange {
+        background: linear-gradient(90deg, #fbbf24, #f97316);
+    }
+    .resource-bar-fill.red {
+        background: linear-gradient(90deg, #f87171, #ef4444);
+    }
+    .resource-value {
+        font-size: 13px;
+        font-weight: 600;
+        color: #d6e3f8;
+        width: 52px;
         text-align: right;
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* 底部时间戳 */
+    .footer {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: flex-end;
+        font-size: 12px;
+        color: #5a6f8c;
+        letter-spacing: 0.3px;
+        align-items: center;
+        gap: 8px;
+    }
+    .footer .brand {
+        color: #7a8fab;
+    }
+
+    /* 小屏幕适配 */
+    @media (max-width: 600px) {
+        body { padding: 14px; width: 100%; }
+        .dashboard { padding: 18px; }
+        .header { flex-direction: column; align-items: stretch; }
+        .stats { justify-content: flex-start; }
+        .resource-row { flex-direction: column; gap: 8px; }
+        .resource-item { min-width: unset; }
     }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="dashboard">
+    <!-- 头部 -->
     <div class="header">
-        <h1>📊 服务器状态</h1>
+        <div class="header-left">
+            <span class="logo-icon">📊</span>
+            <h1>哪吒监控</h1>
+        </div>
         <div class="stats">
-            <span>总计: {{ total }}</span>
-            <span class="online">🟢 {{ online }}</span>
-            <span class="offline">🔴 {{ offline }}</span>
+            <span class="stat-item">🖥️ 总计 <span class="num">{{ total }}</span></span>
+            <span class="stat-item"><span class="online-dot">🟢</span> 在线 <span class="num">{{ online }}</span></span>
+            <span class="stat-item"><span class="offline-dot">🔴</span> 离线 <span class="num">{{ offline }}</span></span>
         </div>
     </div>
+
+    <!-- 服务器卡片列表 -->
     <div class="server-grid">
         {% for server in servers %}
-        <div class="server-item {{ 'offline' if not server.online else '' }}">
-            <div class="server-info">
-                <span class="flag">{{ server.flag }}</span>
-                <span class="name">{{ server.name }}</span>
-                <span class="status-badge {{ 'offline' if not server.online else '' }}">
-                    {{ '在线' if server.online else '离线' }}
-                </span>
+        <div class="server-card {% if not server.online %}offline{% endif %}">
+            <!-- 第一行 -->
+            <div class="card-row">
+                <div class="server-name-group">
+                    <!-- 国旗图标 -->
+                    <span class="flag-icon fi fi-{{ server.country_code|lower }}"></span>
+                    <span class="server-name">{{ server.name }}</span>
+                    <!-- 操作系统图标 (使用 font-logos) -->
+                    {% if server.os_icon %}
+                    <span class="os-icon {{ server.os_icon }}"></span>
+                    {% endif %}
+                </div>
+                <div class="server-status">
+                    <span class="status-badge {% if not server.online %}offline{% endif %}">
+                        <span class="status-dot {% if not server.online %}offline{% endif %}"></span>
+                        {{ '在线' if server.online else '离线' }}
+                    </span>
+                </div>
             </div>
-            <div class="server-resources">
-                <span>
-                    💻 {{ "%.1f"|format(server.cpu) }}%
-                    <span class="cpu-bar"><span class="fill" style="width: {{ "%.0f"|format(server.cpu) }}%;"></span></span>
-                </span>
-                <span>
-                    🧠 {{ "%.1f"|format(server.mem) }}%
-                    <span class="mem-bar"><span class="fill" style="width: {{ "%.0f"|format(server.mem) }}%;"></span></span>
-                </span>
+
+            <!-- 第二行：资源 -->
+            <div class="resource-row">
+                <div class="resource-item">
+                    <span class="resource-label">💻 CPU</span>
+                    <span class="resource-bar-wrap">
+                        <span class="resource-bar-fill {% if server.cpu > 70 %}orange{% elif server.cpu > 90 %}red{% endif %}" style="width: {{ '%.0f'|format(server.cpu) }}%;"></span>
+                    </span>
+                    <span class="resource-value">{{ '%.1f'|format(server.cpu) }}%</span>
+                </div>
+                <div class="resource-item">
+                    <span class="resource-label">🧠 内存</span>
+                    <span class="resource-bar-wrap">
+                        <span class="resource-bar-fill {% if server.mem > 70 %}orange{% elif server.mem > 90 %}red{% endif %}" style="width: {{ '%.0f'|format(server.mem) }}%;"></span>
+                    </span>
+                    <span class="resource-value">{{ '%.1f'|format(server.mem) }}%</span>
+                </div>
+                <div class="resource-item">
+                    <span class="resource-label">💾 磁盘</span>
+                    <span class="resource-bar-wrap">
+                        <span class="resource-bar-fill {% if server.disk > 70 %}orange{% elif server.disk > 90 %}red{% endif %}" style="width: {{ '%.0f'|format(server.disk) }}%;"></span>
+                    </span>
+                    <span class="resource-value">{{ '%.1f'|format(server.disk) }}%</span>
+                </div>
             </div>
         </div>
         {% endfor %}
     </div>
+
+    <!-- 底部 -->
     <div class="footer">
-        哪吒探针 · 更新于 {{ update_time }}
+        <span class="brand">⚡ 哪吒探针</span>
+        <span>·</span>
+        <span>更新于 {{ update_time }}</span>
     </div>
 </div>
 </body>
