@@ -29,7 +29,6 @@
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
-    /* 头部 - 放大 */
     .header {
         display: flex;
         justify-content: space-between;
@@ -77,7 +76,6 @@
     .stat-item .online-dot { color: #4ade80; }
     .stat-item .offline-dot { color: #f87171; }
 
-    /* 服务器卡片 - 单行布局，放大 */
     .server-grid {
         display: flex;
         flex-direction: column;
@@ -101,7 +99,6 @@
         border-color: rgba(255, 100, 100, 0.1);
     }
 
-    /* 左侧：国旗 + 名称 + 系统图标 */
     .server-info {
         display: flex;
         align-items: center;
@@ -127,7 +124,6 @@
         margin-left: 4px;
     }
 
-    /* 中间：资源数值 */
     .server-resources {
         display: flex;
         align-items: center;
@@ -146,16 +142,17 @@
     }
     .resource-item .value {
         font-weight: 600;
-        color: #e8edf5;
         font-variant-numeric: tabular-nums;
         min-width: 52px;
         text-align: right;
         font-size: 17px;
+        transition: color 0.2s ease;
     }
-    .resource-item .value.high { color: #fbbf24; }
-    .resource-item .value.critical { color: #f87171; }
+    /* 颜色规则：< 70% 绿色，70%-90% 黄色，>= 90% 红色 */
+    .resource-item .value.green { color: #4ade80; }
+    .resource-item .value.yellow { color: #fbbf24; }
+    .resource-item .value.red { color: #f87171; }
 
-    /* 右侧：状态徽章 */
     .server-status {
         display: flex;
         align-items: center;
@@ -191,7 +188,6 @@
         box-shadow: 0 0 10px rgba(248, 113, 113, 0.2);
     }
 
-    /* 底部 */
     .footer {
         margin-top: 26px;
         padding-top: 18px;
@@ -204,7 +200,6 @@
     }
     .footer .brand { color: #6a7a9a; }
 
-    /* 响应式 */
     @media (max-width: 800px) {
         body { padding: 16px; }
         .dashboard { padding: 20px; border-radius: 24px; }
@@ -223,11 +218,9 @@
 </head>
 <body>
 <div class="dashboard">
-    <!-- 头部 -->
     <div class="header">
         <div class="header-left">
-            <!-- 从 GitHub 加载 Logo -->
-            <img class="logo" src="https://gh-proxy.com/https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
+            <img class="logo" src="https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
             <h1>哪吒监控</h1>
         </div>
         <div class="stats">
@@ -237,11 +230,9 @@
         </div>
     </div>
 
-    <!-- 服务器列表 - 单行布局 -->
     <div class="server-grid">
         {% for server in servers %}
         <div class="server-card {% if not server.online %}offline{% endif %}">
-            <!-- 左：国旗 + 名称 + 系统图标 -->
             <div class="server-info">
                 <span class="flag-icon fi fi-{{ server.country_code|lower }}"></span>
                 <span class="server-name">{{ server.name }}</span>
@@ -250,14 +241,20 @@
                 {% endif %}
             </div>
 
-            <!-- 中：资源数值 -->
             <div class="server-resources">
-                <span class="resource-item">CPU <span class="value {% if server.cpu|default(0) > 70 %}high{% elif server.cpu|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.cpu|default(0)) }}%</span></span>
-                <span class="resource-item">内存 <span class="value {% if server.mem|default(0) > 70 %}high{% elif server.mem|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.mem|default(0)) }}%</span></span>
-                <span class="resource-item">磁盘 <span class="value {% if server.disk|default(0) > 70 %}high{% elif server.disk|default(0) > 90 %}critical{% endif %}">{{ '%.1f'|format(server.disk|default(0)) }}%</span></span>
+                <!-- CPU：根据数值设置颜色类 -->
+                {% set cpu = server.cpu|default(0) %}
+                <span class="resource-item">CPU <span class="value {% if cpu >= 90 %}red{% elif cpu >= 70 %}yellow{% else %}green{% endif %}">{{ '%.1f'|format(cpu) }}%</span></span>
+
+                <!-- 内存：根据数值设置颜色类 -->
+                {% set mem = server.mem|default(0) %}
+                <span class="resource-item">内存 <span class="value {% if mem >= 90 %}red{% elif mem >= 70 %}yellow{% else %}green{% endif %}">{{ '%.1f'|format(mem) }}%</span></span>
+
+                <!-- 磁盘：根据数值设置颜色类 -->
+                {% set disk = server.disk|default(0) %}
+                <span class="resource-item">磁盘 <span class="value {% if disk >= 90 %}red{% elif disk >= 70 %}yellow{% else %}green{% endif %}">{{ '%.1f'|format(disk) }}%</span></span>
             </div>
 
-            <!-- 右：状态徽章 -->
             <div class="server-status">
                 <span class="status-badge {% if not server.online %}offline{% endif %}">
                     <span class="status-dot {% if not server.online %}offline{% endif %}"></span>
@@ -268,7 +265,6 @@
         {% endfor %}
     </div>
 
-    <!-- 底部 -->
     <div class="footer">
         <span class="brand">⚡ 哪吒探针</span>
         <span>·</span>
