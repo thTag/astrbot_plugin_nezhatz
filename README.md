@@ -71,7 +71,11 @@ verify_ssl    是否验证 SSL 证书（自签名证书可关闭）
 
 TODO
 ---
+
 [ ] 打算 1:1 还原 nezha-dash 但这非常困难, 我们暂时只能使用 HTML
+
+[ ] 适配更多功能, 如 服务 、 详细信息 等
+
 [ ] 目前有 LLM Tools 调用的能力 (后续可能会移除), 哪吒官方提供了 MCP 接口, 因此建议使用官方 MCP
 
 
@@ -79,12 +83,19 @@ TODO
 --------
 
 astrbot_plugin_nezhatz/
+
 ├── main.py               插件主文件
+
 ├── model/
+
 │   └── sysinfo.html      状态图片 HTML 模板
+
 ├── _conf_schema.json     配置定义文件
+
 ├── metadata.yaml         插件元数据
+
 ├── requirements.txt      依赖列表
+
 └── README.md             本文档
 
 
