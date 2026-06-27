@@ -8,11 +8,8 @@
 作者: 叹号大帝
 """
 
-import json
-import os
-import asyncio
-from typing import Optional, List, Dict, Any, AsyncGenerator, Union
-from datetime import datetime, timedelta
+from typing import Optional, Dict, List, Any, AsyncGenerator, Union
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -66,29 +63,30 @@ class NezhaPlugin(Star):
         else:
             self.template_path = Path(__file__).parent / "model" / "sysinfo.html"
         
-        # 缓存模板内容
+        # 缓存模板内容和修改时间
         self._template_cache: Optional[str] = None
+        self._template_mtime: Optional[float] = None
         
         logger.info(f"哪吒探针插件已加载，面板地址: {self.base_url}")
 
     def _load_template(self) -> str:
-        """加载 HTML 模板（带缓存）"""
-        if self._template_cache is not None:
-            return self._template_cache
-        
+        """加载 HTML 模板（带缓存和修改时间检测）"""
         if not self.template_path.exists():
             logger.error(f"模板文件不存在: {self.template_path}")
-            self._template_cache = "<h1>模板加载失败</h1>"
-            return self._template_cache
+            return "<h1>模板加载失败</h1>"
         
-        try:
-            with open(self.template_path, "r", encoding="utf-8") as f:
-                self._template_cache = f.read()
-                return self._template_cache
-        except Exception as e:
-            logger.error(f"加载模板失败: {e}")
-            self._template_cache = "<h1>模板加载失败</h1>"
-            return self._template_cache
+        current_mtime = self.template_path.stat().st_mtime
+        if self._template_cache is None or self._template_mtime != current_mtime:
+            try:
+                with open(self.template_path, "r", encoding="utf-8") as f:
+                    self._template_cache = f.read()
+                    self._template_mtime = current_mtime
+                    logger.debug("模板已重新加载")
+            except Exception as e:
+                logger.error(f"加载模板失败: {e}")
+                return "<h1>模板加载失败</h1>"
+        
+        return self._template_cache or "<h1>模板加载失败</h1>"
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -175,7 +173,7 @@ class NezhaPlugin(Star):
         return self.COUNTRY_FLAGS.get(country_code.lower(), "🌍")
 
     def _get_os_icon(self, platform: str) -> str:
-        """根据操作系统返回 font-logos 图标类名（使用 match 语句）"""
+        """根据操作系统返回 font-logos 图标类名"""
         platform_lower = platform.lower()
         match platform_lower:
             case p if "ubuntu" in p:
@@ -197,17 +195,19 @@ class NezhaPlugin(Star):
             case p if "mac" in p or "darwin" in p:
                 return "fl-macos"
             case _:
-                return ""
+                return "fl-tux"  # 默认使用 Linux 通用企鹅图标
 
     def _format_bytes(self, bytes_val: int) -> str:
-        """格式化字节大小（使用循环简化）"""
+        """格式化字节大小"""
         if bytes_val < 0:
             return "0 B"
         
         units = ["B", "KB", "MB", "GB", "TB"]
         for unit in units:
             if bytes_val < 1024:
-                return f"{bytes_val:.2f} {unit}" if unit != "B" else f"{bytes_val:.0f} B"
+                if unit == "B":
+                    return f"{bytes_val:.0f} B"
+                return f"{bytes_val:.2f} {unit}"
             bytes_val /= 1024
         return f"{bytes_val:.2f} PB"
 
@@ -335,7 +335,6 @@ class NezhaPlugin(Star):
                     
                     geoip = svr.get("geoip", {})
                     country = geoip.get("country_code", "")
-                    flag = self._get_country_flag(country)
                     
                     server_data.append({
                         "name": svr.get("name", "未命名"),
@@ -345,7 +344,6 @@ class NezhaPlugin(Star):
                         "disk": disk_percent,
                         "country_code": country.lower(),
                         "os_icon": self._get_os_icon(host.get("platform", "")),
-                        "flag": flag
                     })
                 
                 # 加载模板并渲染
@@ -457,38 +455,67 @@ class NezhaPlugin(Star):
     )
     async def llm_get_server_data(self, server_id: str) -> str:
         """使用 asyncio.gather 并发获取多个指标"""
+        import asyncio
+        
         metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
         
-        async def fetch_metric(metric: str) -> tuple[str, float]:
+        async def fetch_metric(metric: str) -> tuple[str, Union[float, str]]:
             result = await self._make_request("GET", f"/api/v1/server/{server_id}/metrics?metric={metric}")
             if result and "error" not in result:
                 data = result.get("data", {})
                 points = data.get("data_points", [])
                 if points:
                     return (metric, points[-1].get("value", 0))
-            return (metric, 0)
+                return (metric, 0)
+            elif result and "error" in result:
+                return (metric, f"错误: {result['error']}")
+            return (metric, "获取失败")
         
         tasks = [fetch_metric(m) for m in metrics]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         result_data = {}
+        error_messages = []
         for res in results:
             if isinstance(res, tuple):
-                result_data[res[0]] = res[1]
-            else:
-                logger.warning(f"获取指标失败: {res}")
+                metric, value = res
+                result_data[metric] = value
+                if isinstance(value, str):
+                    error_messages.append(f"{metric}: {value}")
+            elif isinstance(res, Exception):
+                logger.warning(f"获取指标异常: {res}")
         
-        lines = [
-            f"📊 **服务器 {server_id} 实时数据**",
-            f"CPU: {result_data.get('cpu', 0)}%",
-            f"内存: {result_data.get('memory', 0)}%",
-            f"磁盘: {result_data.get('disk', 0)}%",
-            f"入站: {self._format_bytes(result_data.get('net_in_speed', 0))}",
-            f"出站: {self._format_bytes(result_data.get('net_out_speed', 0))}",
-            f"TCP: {result_data.get('tcp_conn', 0)}",
-            f"进程: {result_data.get('process_count', 0)}",
-        ]
+        # 如果有错误，在输出中显示
+        lines = [f"📊 **服务器 {server_id} 实时数据**"]
+        if error_messages:
+            lines.append("⚠️ 部分指标获取失败:")
+            lines.extend(f"  - {msg}" for msg in error_messages)
+            lines.append("")
+        
+        # 只显示成功获取的数值指标
+        numeric_metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
+        for metric in numeric_metrics:
+            value = result_data.get(metric, 0)
+            if not isinstance(value, str):
+                if metric in ["net_in_speed", "net_out_speed"]:
+                    lines.append(f"{self._format_metric_label(metric)}: {self._format_bytes(value)}")
+                else:
+                    lines.append(f"{self._format_metric_label(metric)}: {value}%")
+        
         return "\n".join(lines)
+
+    def _format_metric_label(self, metric: str) -> str:
+        """格式化指标名称"""
+        labels = {
+            "cpu": "CPU",
+            "memory": "内存",
+            "disk": "磁盘",
+            "net_in_speed": "入站",
+            "net_out_speed": "出站",
+            "tcp_conn": "TCP连接",
+            "process_count": "进程数"
+        }
+        return labels.get(metric, metric)
 
     @filter.llm_tool(
         name="nezha_get_notification_groups",
