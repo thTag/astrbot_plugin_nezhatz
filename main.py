@@ -8,6 +8,8 @@
 作者: 叹号大帝
 """
 
+import asyncio
+import json
 from typing import Optional, Dict, List, Any, AsyncGenerator, Union
 from datetime import datetime
 from pathlib import Path
@@ -69,6 +71,8 @@ class NezhaPlugin(Star):
         
         logger.info(f"哪吒探针插件已加载，面板地址: {self.base_url}")
 
+    # ==================== 模板相关 ====================
+
     def _load_template(self) -> str:
         """加载 HTML 模板（带缓存和修改时间检测）"""
         if not self.template_path.exists():
@@ -87,6 +91,17 @@ class NezhaPlugin(Star):
                 return "<h1>模板加载失败</h1>"
         
         return self._template_cache or "<h1>模板加载失败</h1>"
+
+    # ==================== 数据获取 ====================
+
+    async def _fetch_servers(self) -> List[Dict]:
+        """获取服务器列表，统一处理 API 响应"""
+        result = await self._make_request("GET", "/api/v1/server")
+        if result and "error" not in result:
+            servers = result.get("data", []) if isinstance(result, dict) else result
+            if isinstance(servers, list):
+                return servers
+        return []
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -130,7 +145,6 @@ class NezhaPlugin(Star):
         if use_admin and self.admin_token:
             headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.admin_token}"}
         elif use_admin and not self.admin_token:
-            # 如果没有 admin_token，移除普通 token 以避免权限混淆
             headers = {"Content-Type": "application/json"}
         else:
             headers = self._get_headers()
@@ -150,7 +164,11 @@ class NezhaPlugin(Star):
                     return {"error": f"不支持的HTTP方法: {method}"}
                 
                 if response.status_code == 200:
-                    return response.json()
+                    try:
+                        return response.json()
+                    except json.JSONDecodeError as e:
+                        logger.error(f"解析 JSON 响应失败: {e}, 响应内容: {response.text[:200]}")
+                        return {"error": "响应格式错误，请检查面板地址是否正确"}
                 elif response.status_code == 401:
                     logger.error("API认证失败，请检查API Token是否正确")
                     return {"error": "认证失败，请检查API Token"}
@@ -167,6 +185,8 @@ class NezhaPlugin(Star):
         except Exception as e:
             logger.error(f"请求异常: {e}")
             return {"error": str(e)}
+
+    # ==================== 格式化辅助 ====================
 
     def _get_country_flag(self, country_code: str) -> str:
         """获取国家旗帜 Emoji"""
@@ -195,7 +215,7 @@ class NezhaPlugin(Star):
             case p if "mac" in p or "darwin" in p:
                 return "fl-macos"
             case _:
-                return "fl-tux"  # 默认使用 Linux 通用企鹅图标
+                return "fl-tux"
 
     def _format_bytes(self, bytes_val: int) -> str:
         """格式化字节大小"""
@@ -222,6 +242,19 @@ class NezhaPlugin(Star):
             days = seconds // 86400
             hours = seconds % 86400 // 3600
             return f"{days}天 {hours}小时"
+
+    def _format_metric_label(self, metric: str) -> str:
+        """格式化指标名称"""
+        labels = {
+            "cpu": "CPU",
+            "memory": "内存",
+            "disk": "磁盘",
+            "net_in_speed": "入站",
+            "net_out_speed": "出站",
+            "tcp_conn": "TCP连接",
+            "process_count": "进程数"
+        }
+        return labels.get(metric, metric)
 
     # ==================== 指令处理器 ====================
 
@@ -256,129 +289,116 @@ class NezhaPlugin(Star):
 
     async def _handle_list(self, event: AstrMessageEvent) -> AsyncGenerator:
         """文字版列表"""
-        result = await self._make_request("GET", "/api/v1/server")
-        if result and "error" not in result:
-            servers = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(servers, list):
-                lines = ["📊 **服务器列表**", ""]
-                for svr in servers:
-                    name = svr.get("name", "未命名")
-                    is_online = self._is_online(svr)
-                    status_icon = "🟢" if is_online else "🔴"
-                    state = svr.get("state", {})
-                    cpu = state.get("cpu", 0)
-                    lines.append(f"{status_icon} {name} - CPU: {cpu:.1f}%")
-                yield event.plain_result("\n".join(lines))
-            else:
-                yield event.plain_result("❌ 获取服务器列表失败：数据格式异常")
+        servers = await self._fetch_servers()
+        if servers:
+            lines = ["📊 **服务器列表**", ""]
+            for svr in servers:
+                name = svr.get("name", "未命名")
+                is_online = self._is_online(svr)
+                status_icon = "🟢" if is_online else "🔴"
+                state = svr.get("state", {})
+                cpu = state.get("cpu", 0)
+                lines.append(f"{status_icon} {name} - CPU: {cpu:.1f}%")
+            yield event.plain_result("\n".join(lines))
         else:
-            error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-            yield event.plain_result(f"❌ 获取服务器列表失败: {error_msg}")
+            yield event.plain_result("❌ 获取服务器列表失败：数据格式异常")
 
     async def _handle_detail(self, event: AstrMessageEvent, server_id: str) -> AsyncGenerator:
         """文字版详情"""
-        result = await self._make_request("GET", "/api/v1/server")
-        if result and "error" not in result:
-            servers = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(servers, list):
-                server = next((s for s in servers if str(s.get("id")) == server_id), None)
-                if server:
-                    state = server.get("state", {})
-                    host = server.get("host", {})
-                    is_online = self._is_online(server)
-                    
-                    lines = [
-                        "📋 **服务器详细信息**",
-                        "",
-                        f"🔹 **名称**: {server.get('name', 'N/A')}",
-                        f"🔹 **ID**: {server.get('id', 'N/A')}",
-                        f"🔹 **状态**: {'🟢 在线' if is_online else '🔴 离线'}",
-                        f"🔹 **系统**: {host.get('platform', 'N/A')} {host.get('platform_version', '')}",
-                        f"🔹 **CPU**: {state.get('cpu', 0):.1f}%",
-                        f"🔹 **内存**: {self._format_bytes(state.get('mem_used', 0))} / {self._format_bytes(host.get('mem_total', 0))}",
-                        f"🔹 **磁盘**: {self._format_bytes(state.get('disk_used', 0))} / {self._format_bytes(host.get('disk_total', 0))}",
-                        f"🔹 **入站**: {self._format_bytes(state.get('net_in_transfer', 0))}",
-                        f"🔹 **出站**: {self._format_bytes(state.get('net_out_transfer', 0))}",
-                        f"🔹 **运行时间**: {self._format_uptime(state.get('uptime', 0))}",
-                    ]
-                    yield event.plain_result("\n".join(lines))
-                else:
-                    yield event.plain_result(f"❌ 未找到 ID 为 {server_id} 的服务器")
+        servers = await self._fetch_servers()
+        if servers:
+            server = next((s for s in servers if str(s.get("id")) == server_id), None)
+            if server:
+                state = server.get("state", {})
+                host = server.get("host", {})
+                is_online = self._is_online(server)
+                
+                lines = [
+                    "📋 **服务器详细信息**",
+                    "",
+                    f"🔹 **名称**: {server.get('name', 'N/A')}",
+                    f"🔹 **ID**: {server.get('id', 'N/A')}",
+                    f"🔹 **状态**: {'🟢 在线' if is_online else '🔴 离线'}",
+                    f"🔹 **系统**: {host.get('platform', 'N/A')} {host.get('platform_version', '')}",
+                    f"🔹 **CPU**: {state.get('cpu', 0):.1f}%",
+                    f"🔹 **内存**: {self._format_bytes(state.get('mem_used', 0))} / {self._format_bytes(host.get('mem_total', 0))}",
+                    f"🔹 **磁盘**: {self._format_bytes(state.get('disk_used', 0))} / {self._format_bytes(host.get('disk_total', 0))}",
+                    f"🔹 **入站**: {self._format_bytes(state.get('net_in_transfer', 0))}",
+                    f"🔹 **出站**: {self._format_bytes(state.get('net_out_transfer', 0))}",
+                    f"🔹 **运行时间**: {self._format_uptime(state.get('uptime', 0))}",
+                ]
+                yield event.plain_result("\n".join(lines))
             else:
-                yield event.plain_result("❌ 获取服务器详情失败：数据格式异常")
+                yield event.plain_result(f"❌ 未找到 ID 为 {server_id} 的服务器")
         else:
-            error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-            yield event.plain_result(f"❌ 获取服务器详情失败: {error_msg}")
+            yield event.plain_result("❌ 获取服务器详情失败：数据格式异常")
 
     async def _handle_status(self, event: AstrMessageEvent) -> AsyncGenerator:
         """状态概览 - 图片版"""
-        result = await self._make_request("GET", "/api/v1/server")
-        if result and "error" not in result:
-            servers = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(servers, list):
-                # 准备数据
-                total = len(servers)
-                online_count = sum(1 for s in servers if self._is_online(s))
-                offline_count = total - online_count
-                
-                server_data = []
-                for svr in servers:
-                    state = svr.get("state", {})
-                    host = svr.get("host", {})
-                    mem_total = host.get("mem_total", 0)
-                    mem_used = state.get("mem_used", 0)
-                    mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
-                    
-                    disk_total = host.get("disk_total", 0)
-                    disk_used = state.get("disk_used", 0)
-                    disk_percent = (disk_used / disk_total * 100) if disk_total > 0 else 0
-                    
-                    geoip = svr.get("geoip", {})
-                    country = geoip.get("country_code", "")
-                    
-                    server_data.append({
-                        "name": svr.get("name", "未命名"),
-                        "online": self._is_online(svr),
-                        "cpu": state.get("cpu", 0),
-                        "mem": mem_percent,
-                        "disk": disk_percent,
-                        "country_code": country.lower(),
-                        "os_icon": self._get_os_icon(host.get("platform", "")),
-                    })
-                
-                # 加载模板并渲染
-                template = self._load_template()
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-                try:
-                    image_url = await self.html_render(
-                        template,
-                        {
-                            "total": total,
-                            "online": online_count,
-                            "offline": offline_count,
-                            "servers": server_data,
-                            "update_time": now
-                        },
-                        options={
-                            "full_page": True,
-                            "type": "png",
-                            "scale": "css"
-                        }
-                    )
-                    
-                    if not image_url:
-                        yield event.plain_result("❌ 生成状态图片失败，请检查 HTML 模板是否完整")
-                    else:
-                        yield event.image_result(image_url)
-                except Exception as e:
-                    logger.error(f"渲染图片失败: {e}")
-                    yield event.plain_result(f"❌ 渲染图片失败: {e}")
+        servers = await self._fetch_servers()
+        if not servers:
+            yield event.plain_result("❌ 获取状态失败：数据格式异常")
+            return
+        
+        # 准备数据
+        total = len(servers)
+        online_count = sum(1 for s in servers if self._is_online(s))
+        offline_count = total - online_count
+        
+        server_data = []
+        for svr in servers:
+            state = svr.get("state", {})
+            host = svr.get("host", {})
+            mem_total = host.get("mem_total", 0)
+            mem_used = state.get("mem_used", 0)
+            mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
+            
+            disk_total = host.get("disk_total", 0)
+            disk_used = state.get("disk_used", 0)
+            disk_percent = (disk_used / disk_total * 100) if disk_total > 0 else 0
+            
+            geoip = svr.get("geoip", {})
+            country = geoip.get("country_code", "")
+            
+            server_data.append({
+                "name": svr.get("name", "未命名"),
+                "online": self._is_online(svr),
+                "cpu": state.get("cpu", 0),
+                "mem": mem_percent,
+                "disk": disk_percent,
+                "country_code": country.lower(),
+                "os_icon": self._get_os_icon(host.get("platform", "")),
+                "flag": self._get_country_flag(country),  # 恢复 flag 字段以保持模板兼容
+            })
+        
+        # 加载模板并渲染
+        template = self._load_template()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        try:
+            image_url = await self.html_render(
+                template,
+                {
+                    "total": total,
+                    "online": online_count,
+                    "offline": offline_count,
+                    "servers": server_data,
+                    "update_time": now
+                },
+                options={
+                    "full_page": True,
+                    "type": "png",
+                    "scale": "css"
+                }
+            )
+            
+            if not image_url:
+                yield event.plain_result("❌ 生成状态图片失败，请检查 HTML 模板是否完整")
             else:
-                yield event.plain_result("❌ 获取状态失败：数据格式异常")
-        else:
-            error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-            yield event.plain_result(f"❌ 获取状态失败: {error_msg}")
+                yield event.image_result(image_url)
+        except Exception as e:
+            logger.error(f"渲染图片失败: {e}")
+            yield event.plain_result(f"❌ 渲染图片失败: {e}")
 
     # ==================== LLM Tools ====================
 
@@ -387,67 +407,59 @@ class NezhaPlugin(Star):
         description="获取哪吒监控中所有服务器的列表和基本状态信息"
     )
     async def llm_list_servers(self) -> str:
-        result = await self._make_request("GET", "/api/v1/server")
-        if result and "error" not in result:
-            servers = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(servers, list):
-                lines = ["📊 服务器列表:"]
-                for svr in servers:
-                    name = svr.get("name", "未命名")
-                    is_online = self._is_online(svr)
-                    status_icon = "🟢" if is_online else "🔴"
-                    state = svr.get("state", {})
-                    cpu = state.get("cpu", 0)
-                    lines.append(f"{status_icon} {name} - CPU: {cpu:.1f}%")
-                return "\n".join(lines)
-            return "获取服务器列表失败：数据格式异常"
-        error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-        return f"获取服务器列表失败: {error_msg}"
+        servers = await self._fetch_servers()
+        if not servers:
+            return "获取服务器列表失败"
+        
+        lines = ["📊 服务器列表:"]
+        for svr in servers:
+            name = svr.get("name", "未命名")
+            is_online = self._is_online(svr)
+            status_icon = "🟢" if is_online else "🔴"
+            state = svr.get("state", {})
+            cpu = state.get("cpu", 0)
+            lines.append(f"{status_icon} {name} - CPU: {cpu:.1f}%")
+        return "\n".join(lines)
 
     @filter.llm_tool(
         name="nezha_get_server_detail",
         description="获取指定服务器的详细信息"
     )
     async def llm_get_server_detail(self, server_id: str) -> str:
-        result = await self._make_request("GET", "/api/v1/server")
-        if result and "error" not in result:
-            servers = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(servers, list):
-                server = next((s for s in servers if str(s.get("id")) == server_id), None)
-                if server:
-                    state = server.get("state", {})
-                    host = server.get("host", {})
-                    is_online = self._is_online(server)
-                    lines = [
-                        f"📋 {server.get('name', 'N/A')} 详情:",
-                        f"状态: {'在线' if is_online else '离线'}",
-                        f"CPU: {state.get('cpu', 0):.1f}%",
-                        f"内存: {self._format_bytes(state.get('mem_used', 0))} / {self._format_bytes(host.get('mem_total', 0))}",
-                        f"运行时间: {self._format_uptime(state.get('uptime', 0))}",
-                    ]
-                    return "\n".join(lines)
-                return f"❌ 未找到 ID 为 {server_id} 的服务器"
-            return "获取服务器详情失败：数据格式异常"
-        error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-        return f"获取服务器详情失败: {error_msg}"
+        servers = await self._fetch_servers()
+        if not servers:
+            return "获取服务器详情失败"
+        
+        server = next((s for s in servers if str(s.get("id")) == server_id), None)
+        if not server:
+            return f"❌ 未找到 ID 为 {server_id} 的服务器"
+        
+        state = server.get("state", {})
+        host = server.get("host", {})
+        is_online = self._is_online(server)
+        lines = [
+            f"📋 {server.get('name', 'N/A')} 详情:",
+            f"状态: {'在线' if is_online else '离线'}",
+            f"CPU: {state.get('cpu', 0):.1f}%",
+            f"内存: {self._format_bytes(state.get('mem_used', 0))} / {self._format_bytes(host.get('mem_total', 0))}",
+            f"运行时间: {self._format_uptime(state.get('uptime', 0))}",
+        ]
+        return "\n".join(lines)
 
     @filter.llm_tool(
         name="nezha_server_status_summary",
         description="获取所有服务器的状态概览"
     )
     async def llm_server_status_summary(self) -> str:
-        result = await self._make_request("GET", "/api/v1/server")
-        if result and "error" not in result:
-            servers = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(servers, list):
-                total = len(servers)
-                online = sum(1 for s in servers if self._is_online(s))
-                total_cpu = sum(s.get("state", {}).get("cpu", 0) for s in servers)
-                avg_cpu = total_cpu / total if total > 0 else 0
-                return f"📊 服务器状态概览\n总计: {total} 台\n在线: {online} 台\n离线: {total - online} 台\n平均CPU: {avg_cpu:.1f}%"
-            return "获取状态失败：数据格式异常"
-        error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-        return f"获取状态失败: {error_msg}"
+        servers = await self._fetch_servers()
+        if not servers:
+            return "获取状态失败"
+        
+        total = len(servers)
+        online = sum(1 for s in servers if self._is_online(s))
+        total_cpu = sum(s.get("state", {}).get("cpu", 0) for s in servers)
+        avg_cpu = total_cpu / total if total > 0 else 0
+        return f"📊 服务器状态概览\n总计: {total} 台\n在线: {online} 台\n离线: {total - online} 台\n平均CPU: {avg_cpu:.1f}%"
 
     @filter.llm_tool(
         name="nezha_get_server_data",
@@ -455,18 +467,16 @@ class NezhaPlugin(Star):
     )
     async def llm_get_server_data(self, server_id: str) -> str:
         """使用 asyncio.gather 并发获取多个指标"""
-        import asyncio
-        
         metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
         
-        async def fetch_metric(metric: str) -> tuple[str, Union[float, str]]:
+        async def fetch_metric(metric: str) -> tuple[str, Union[float, str, None]]:
             result = await self._make_request("GET", f"/api/v1/server/{server_id}/metrics?metric={metric}")
             if result and "error" not in result:
                 data = result.get("data", {})
                 points = data.get("data_points", [])
                 if points:
                     return (metric, points[-1].get("value", 0))
-                return (metric, 0)
+                return (metric, None)  # 无数据点
             elif result and "error" in result:
                 return (metric, f"错误: {result['error']}")
             return (metric, "获取失败")
@@ -485,37 +495,29 @@ class NezhaPlugin(Star):
             elif isinstance(res, Exception):
                 logger.warning(f"获取指标异常: {res}")
         
-        # 如果有错误，在输出中显示
         lines = [f"📊 **服务器 {server_id} 实时数据**"]
+        
         if error_messages:
             lines.append("⚠️ 部分指标获取失败:")
             lines.extend(f"  - {msg}" for msg in error_messages)
             lines.append("")
         
-        # 只显示成功获取的数值指标
+        # 显示指标
         numeric_metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
         for metric in numeric_metrics:
-            value = result_data.get(metric, 0)
-            if not isinstance(value, str):
+            value = result_data.get(metric)
+            label = self._format_metric_label(metric)
+            if value is None:
+                lines.append(f"{label}: 暂无数据")
+            elif isinstance(value, str):
+                lines.append(f"{label}: {value}")
+            elif isinstance(value, (int, float)):
                 if metric in ["net_in_speed", "net_out_speed"]:
-                    lines.append(f"{self._format_metric_label(metric)}: {self._format_bytes(value)}")
+                    lines.append(f"{label}: {self._format_bytes(value)}")
                 else:
-                    lines.append(f"{self._format_metric_label(metric)}: {value}%")
+                    lines.append(f"{label}: {value}%")
         
         return "\n".join(lines)
-
-    def _format_metric_label(self, metric: str) -> str:
-        """格式化指标名称"""
-        labels = {
-            "cpu": "CPU",
-            "memory": "内存",
-            "disk": "磁盘",
-            "net_in_speed": "入站",
-            "net_out_speed": "出站",
-            "tcp_conn": "TCP连接",
-            "process_count": "进程数"
-        }
-        return labels.get(metric, metric)
 
     @filter.llm_tool(
         name="nezha_get_notification_groups",
