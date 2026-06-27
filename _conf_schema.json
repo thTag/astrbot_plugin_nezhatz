@@ -18,9 +18,37 @@
         "default": ""
     },
     "verify_ssl": {
-        "type": "bool",
+        "type": "boolean",
         "description": "是否验证 SSL 证书",
         "hint": "如果面板使用自签名证书且连接出错，可关闭验证",
         "default": true
+    },
+    "request_timeout": {
+        "type": "number",
+        "description": "API 请求超时时间（秒）",
+        "hint": "网络较慢时可适当增大",
+        "default": 30.0,
+        "minimum": 1.0
+    },
+    "cache_ttl_seconds": {
+        "type": "number",
+        "description": "服务器列表缓存有效期（秒）",
+        "hint": "数值越小数据越实时，但 API 请求越频繁",
+        "default": 30.0,
+        "minimum": 1.0
+    },
+    "max_keepalive_connections": {
+        "type": "integer",
+        "description": "HTTP 连接池保持的最大空闲连接数",
+        "hint": "保持长连接复用，减少握手开销",
+        "default": 20,
+        "minimum": 1
+    },
+    "max_connections": {
+        "type": "integer",
+        "description": "HTTP 连接池最大并发连接数",
+        "hint": "同时请求多个服务器时的并发限制",
+        "default": 50,
+        "minimum": 1
     }
 }
