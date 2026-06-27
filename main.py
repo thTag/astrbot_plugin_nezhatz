@@ -839,6 +839,7 @@ class NezhaPlugin(Star):
             data["disk_percent"] = (info.disk_used / max(info.disk_total, 1) * 100)
             data["os_icon"] = self._get_os_icon(info.platform)
             data["flag"] = self._get_country_flag(info.geoip_country)
+            data["country_code"] = info.geoip_country.lower()
             server_data.append(data)
         return server_data
 
