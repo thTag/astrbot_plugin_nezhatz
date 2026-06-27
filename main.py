@@ -10,14 +10,15 @@
 
 import json
 import os
-from typing import Optional, List, Dict, Any
+import asyncio
+from typing import Optional, List, Dict, Any, AsyncGenerator, Union
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
 from astrbot.api import logger, AstrBotConfig
 from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star, register, StarTools
 
 
 @register(
@@ -31,6 +32,22 @@ class NezhaPlugin(Star):
     """哪吒探针插件主类"""
 
     ONLINE_THRESHOLD_SECONDS = 300
+    DEFAULT_REQUEST_TIMEOUT = 30.0
+
+    # 国家旗帜映射
+    COUNTRY_FLAGS = {
+        "cn": "🇨🇳", "us": "🇺🇸", "hk": "🇭🇰", "jp": "🇯🇵",
+        "kr": "🇰🇷", "sg": "🇸🇬", "uk": "🇬🇧", "de": "🇩🇪",
+        "fr": "🇫🇷", "ru": "🇷🇺", "au": "🇦🇺", "ca": "🇨🇦",
+        "in": "🇮🇳", "br": "🇧🇷", "mx": "🇲🇽", "it": "🇮🇹",
+        "es": "🇪🇸", "nl": "🇳🇱", "se": "🇸🇪", "no": "🇳🇴",
+        "fi": "🇫🇮", "is": "🇮🇸", "pl": "🇵🇱", "ua": "🇺🇦",
+        "tr": "🇹🇷", "ae": "🇦🇪", "sa": "🇸🇦", "il": "🇮🇱",
+        "za": "🇿🇦", "eg": "🇪🇬", "ng": "🇳🇬", "ke": "🇰🇪",
+        "tw": "🇹🇼", "mo": "🇲🇴", "my": "🇲🇾", "th": "🇹🇭",
+        "vn": "🇻🇳", "ph": "🇵🇭", "id": "🇮🇩", "pk": "🇵🇰",
+        "bd": "🇧🇩", "kz": "🇰🇿", "uz": "🇺🇿"
+    }
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -39,23 +56,39 @@ class NezhaPlugin(Star):
         self.api_token = self.config.get("api_token", "")
         self.admin_token = self.config.get("admin_token", "")
         self.verify_ssl = self.config.get("verify_ssl", True)
+        self.request_timeout = self.config.get("request_timeout", self.DEFAULT_REQUEST_TIMEOUT)
         
-        # 模板路径
-        self.template_path = Path(__file__).parent / "model" / "sysinfo.html"
+        # 初始化模板路径 - 优先使用数据目录下的自定义模板
+        data_dir = StarTools.get_data_dir()
+        custom_template = data_dir / "model" / "sysinfo.html"
+        if custom_template.exists():
+            self.template_path = custom_template
+        else:
+            self.template_path = Path(__file__).parent / "model" / "sysinfo.html"
+        
+        # 缓存模板内容
+        self._template_cache: Optional[str] = None
         
         logger.info(f"哪吒探针插件已加载，面板地址: {self.base_url}")
 
     def _load_template(self) -> str:
-        """加载 HTML 模板"""
+        """加载 HTML 模板（带缓存）"""
+        if self._template_cache is not None:
+            return self._template_cache
+        
         if not self.template_path.exists():
             logger.error(f"模板文件不存在: {self.template_path}")
-            return "<h1>模板加载失败</h1>"
+            self._template_cache = "<h1>模板加载失败</h1>"
+            return self._template_cache
+        
         try:
             with open(self.template_path, "r", encoding="utf-8") as f:
-                return f.read()
+                self._template_cache = f.read()
+                return self._template_cache
         except Exception as e:
             logger.error(f"加载模板失败: {e}")
-            return "<h1>模板加载失败</h1>"
+            self._template_cache = "<h1>模板加载失败</h1>"
+            return self._template_cache
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -78,7 +111,7 @@ class NezhaPlugin(Star):
             logger.warning("dateutil 未安装，使用简单时间判断，建议安装 python-dateutil")
             return True
         except Exception as e:
-            logger.debug(f"解析 last_active 失败: {e}")
+            logger.warning(f"解析 last_active 失败，可能影响在线状态判断: {e}")
             return False
 
     async def _make_request(
@@ -94,13 +127,18 @@ class NezhaPlugin(Star):
             
         url = f"{self.base_url}{endpoint}"
         logger.debug(f"请求 URL: {url}")
-        headers = self._get_headers()
         
+        # 处理 headers
         if use_admin and self.admin_token:
-            headers["Authorization"] = f"Bearer {self.admin_token}"
+            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.admin_token}"}
+        elif use_admin and not self.admin_token:
+            # 如果没有 admin_token，移除普通 token 以避免权限混淆
+            headers = {"Content-Type": "application/json"}
+        else:
+            headers = self._get_headers()
         
         try:
-            async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            async with httpx.AsyncClient(verify=self.verify_ssl, timeout=self.request_timeout) as client:
                 if method.upper() == "GET":
                     response = await client.get(url, headers=headers)
                 elif method.upper() == "POST":
@@ -134,54 +172,44 @@ class NezhaPlugin(Star):
 
     def _get_country_flag(self, country_code: str) -> str:
         """获取国家旗帜 Emoji"""
-        flags = {
-            "cn": "🇨🇳", "us": "🇺🇸", "hk": "🇭🇰", "jp": "🇯🇵",
-            "kr": "🇰🇷", "sg": "🇸🇬", "uk": "🇬🇧", "de": "🇩🇪",
-            "fr": "🇫🇷", "ru": "🇷🇺", "au": "🇦🇺", "ca": "🇨🇦",
-            "in": "🇮🇳", "br": "🇧🇷", "mx": "🇲🇽", "it": "🇮🇹",
-            "es": "🇪🇸", "nl": "🇳🇱", "se": "🇸🇪", "no": "🇳🇴",
-            "fi": "🇫🇮", "is": "🇮🇸", "pl": "🇵🇱", "ua": "🇺🇦",
-            "tr": "🇹🇷", "ae": "🇦🇪", "sa": "🇸🇦", "il": "🇮🇱",
-            "za": "🇿🇦", "eg": "🇪🇬", "ng": "🇳🇬", "ke": "🇰🇪",
-            "tw": "🇹🇼", "mo": "🇲🇴", "my": "🇲🇾", "th": "🇹🇭",
-            "vn": "🇻🇳", "ph": "🇵🇭", "id": "🇮🇩", "pk": "🇵🇰",
-            "bd": "🇧🇩", "kz": "🇰🇿", "uz": "🇺🇿"
-        }
-        return flags.get(country_code.lower(), "🌍")
+        return self.COUNTRY_FLAGS.get(country_code.lower(), "🌍")
 
     def _get_os_icon(self, platform: str) -> str:
-        """根据操作系统返回 font-logos 图标类名"""
+        """根据操作系统返回 font-logos 图标类名（使用 match 语句）"""
         platform_lower = platform.lower()
-        if "ubuntu" in platform_lower:
-            return "fl-ubuntu"
-        elif "debian" in platform_lower:
-            return "fl-debian"
-        elif "centos" in platform_lower or "rhel" in platform_lower:
-            return "fl-centos"
-        elif "fedora" in platform_lower:
-            return "fl-fedora"
-        elif "alpine" in platform_lower:
-            return "fl-alpine"
-        elif "arch" in platform_lower:
-            return "fl-archlinux"
-        elif "opensuse" in platform_lower:
-            return "fl-opensuse"
-        elif "windows" in platform_lower:
-            return "fl-windows"
-        elif "mac" in platform_lower or "darwin" in platform_lower:
-            return "fl-macos"
-        else:
-            return ""
+        match platform_lower:
+            case p if "ubuntu" in p:
+                return "fl-ubuntu"
+            case p if "debian" in p:
+                return "fl-debian"
+            case p if "centos" in p or "rhel" in p:
+                return "fl-centos"
+            case p if "fedora" in p:
+                return "fl-fedora"
+            case p if "alpine" in p:
+                return "fl-alpine"
+            case p if "arch" in p:
+                return "fl-archlinux"
+            case p if "opensuse" in p:
+                return "fl-opensuse"
+            case p if "windows" in p:
+                return "fl-windows"
+            case p if "mac" in p or "darwin" in p:
+                return "fl-macos"
+            case _:
+                return ""
 
     def _format_bytes(self, bytes_val: int) -> str:
-        if bytes_val < 1024:
-            return f"{bytes_val} B"
-        elif bytes_val < 1024 * 1024:
-            return f"{bytes_val / 1024:.2f} KB"
-        elif bytes_val < 1024 * 1024 * 1024:
-            return f"{bytes_val / (1024 * 1024):.2f} MB"
-        else:
-            return f"{bytes_val / (1024 * 1024 * 1024):.2f} GB"
+        """格式化字节大小（使用循环简化）"""
+        if bytes_val < 0:
+            return "0 B"
+        
+        units = ["B", "KB", "MB", "GB", "TB"]
+        for unit in units:
+            if bytes_val < 1024:
+                return f"{bytes_val:.2f} {unit}" if unit != "B" else f"{bytes_val:.0f} B"
+            bytes_val /= 1024
+        return f"{bytes_val:.2f} PB"
 
     def _format_uptime(self, seconds: int) -> str:
         if seconds < 60:
@@ -198,7 +226,7 @@ class NezhaPlugin(Star):
     # ==================== 指令处理器 ====================
 
     @filter.command("nezha")
-    async def nezha_cmd(self, event: AstrMessageEvent):
+    async def nezha_cmd(self, event: AstrMessageEvent) -> AsyncGenerator:
         parts = event.message_str.strip().split()
         
         if len(parts) < 2:
@@ -226,7 +254,7 @@ class NezhaPlugin(Star):
                 "`/nezha status` - 查看状态概览（图片）"
             )
 
-    async def _handle_list(self, event: AstrMessageEvent):
+    async def _handle_list(self, event: AstrMessageEvent) -> AsyncGenerator:
         """文字版列表"""
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
@@ -247,7 +275,7 @@ class NezhaPlugin(Star):
             error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
             yield event.plain_result(f"❌ 获取服务器列表失败: {error_msg}")
 
-    async def _handle_detail(self, event: AstrMessageEvent, server_id: str):
+    async def _handle_detail(self, event: AstrMessageEvent, server_id: str) -> AsyncGenerator:
         """文字版详情"""
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
@@ -257,7 +285,6 @@ class NezhaPlugin(Star):
                 if server:
                     state = server.get("state", {})
                     host = server.get("host", {})
-                    geoip = server.get("geoip", {})
                     is_online = self._is_online(server)
                     
                     lines = [
@@ -283,7 +310,7 @@ class NezhaPlugin(Star):
             error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
             yield event.plain_result(f"❌ 获取服务器详情失败: {error_msg}")
 
-    async def _handle_status(self, event: AstrMessageEvent):
+    async def _handle_status(self, event: AstrMessageEvent) -> AsyncGenerator:
         """状态概览 - 图片版"""
         result = await self._make_request("GET", "/api/v1/server")
         if result and "error" not in result:
@@ -325,23 +352,30 @@ class NezhaPlugin(Star):
                 template = self._load_template()
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                image_url = await self.html_render(
-                    template,
-                    {
-                        "total": total,
-                        "online": online_count,
-                        "offline": offline_count,
-                        "servers": server_data,
-                        "update_time": now
-                    },
-                    options={
-                        "full_page": True,
-                        "type": "png",
-                        "scale": "css"
-                    }
-                )
-                # 返回图片（当前版本不支持 extra 参数）
-                yield event.image_result(image_url)
+                try:
+                    image_url = await self.html_render(
+                        template,
+                        {
+                            "total": total,
+                            "online": online_count,
+                            "offline": offline_count,
+                            "servers": server_data,
+                            "update_time": now
+                        },
+                        options={
+                            "full_page": True,
+                            "type": "png",
+                            "scale": "css"
+                        }
+                    )
+                    
+                    if not image_url:
+                        yield event.plain_result("❌ 生成状态图片失败，请检查 HTML 模板是否完整")
+                    else:
+                        yield event.image_result(image_url)
+                except Exception as e:
+                    logger.error(f"渲染图片失败: {e}")
+                    yield event.plain_result(f"❌ 渲染图片失败: {e}")
             else:
                 yield event.plain_result("❌ 获取状态失败：数据格式异常")
         else:
@@ -422,20 +456,27 @@ class NezhaPlugin(Star):
         description="获取服务器的实时数据指标"
     )
     async def llm_get_server_data(self, server_id: str) -> str:
+        """使用 asyncio.gather 并发获取多个指标"""
         metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
-        result_data = {}
         
-        for metric in metrics:
+        async def fetch_metric(metric: str) -> tuple[str, float]:
             result = await self._make_request("GET", f"/api/v1/server/{server_id}/metrics?metric={metric}")
             if result and "error" not in result:
                 data = result.get("data", {})
                 points = data.get("data_points", [])
                 if points:
-                    result_data[metric] = points[-1].get("value", 0)
-                else:
-                    result_data[metric] = 0
+                    return (metric, points[-1].get("value", 0))
+            return (metric, 0)
+        
+        tasks = [fetch_metric(m) for m in metrics]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        result_data = {}
+        for res in results:
+            if isinstance(res, tuple):
+                result_data[res[0]] = res[1]
             else:
-                result_data[metric] = 0
+                logger.warning(f"获取指标失败: {res}")
         
         lines = [
             f"📊 **服务器 {server_id} 实时数据**",
