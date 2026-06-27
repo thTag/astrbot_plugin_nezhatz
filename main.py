@@ -368,7 +368,7 @@ class NezhaPlugin(Star):
                 "disk": disk_percent,
                 "country_code": country.lower(),
                 "os_icon": self._get_os_icon(host.get("platform", "")),
-                "flag": self._get_country_flag(country),  # 恢复 flag 字段以保持模板兼容
+                "flag": self._get_country_flag(country),
             })
         
         # 加载模板并渲染
@@ -476,7 +476,7 @@ class NezhaPlugin(Star):
                 points = data.get("data_points", [])
                 if points:
                     return (metric, points[-1].get("value", 0))
-                return (metric, None)  # 无数据点
+                return (metric, None)
             elif result and "error" in result:
                 return (metric, f"错误: {result['error']}")
             return (metric, "获取失败")
@@ -502,7 +502,6 @@ class NezhaPlugin(Star):
             lines.extend(f"  - {msg}" for msg in error_messages)
             lines.append("")
         
-        # 显示指标
         numeric_metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
         for metric in numeric_metrics:
             value = result_data.get(metric)
