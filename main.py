@@ -12,21 +12,22 @@ import asyncio
 import json
 import random
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Dict, List, Any, AsyncGenerator, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import httpx
-from astrbot.api import logger, AstrBotConfig
-from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register, StarTools
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.star import Context, Star, StarTools, register
 
 
 @dataclass
 class ServerInfo:
     """服务器信息数据类"""
+
     id: int
     name: str
     online: bool
@@ -53,7 +54,7 @@ class ServerInfo:
     "叹号大帝",
     "哪吒探针 - 查看哪吒监控站点服务器状态",
     "1.0.0",
-    "https://github.com/thTag/astrbot_plugin_nezhatz"
+    "https://github.com/thTag/astrbot_plugin_nezhatz",
 )
 class NezhaPlugin(Star):
     """哪吒探针插件主类"""
@@ -89,17 +90,49 @@ class NezhaPlugin(Star):
 
     # 国家旗帜映射（使用 MappingProxyType 防止意外修改）
     COUNTRY_FLAGS: Dict[str, str] = {
-        "cn": "🇨🇳", "us": "🇺🇸", "hk": "🇭🇰", "jp": "🇯🇵",
-        "kr": "🇰🇷", "sg": "🇸🇬", "uk": "🇬🇧", "de": "🇩🇪",
-        "fr": "🇫🇷", "ru": "🇷🇺", "au": "🇦🇺", "ca": "🇨🇦",
-        "in": "🇮🇳", "br": "🇧🇷", "mx": "🇲🇽", "it": "🇮🇹",
-        "es": "🇪🇸", "nl": "🇳🇱", "se": "🇸🇪", "no": "🇳🇴",
-        "fi": "🇫🇮", "is": "🇮🇸", "pl": "🇵🇱", "ua": "🇺🇦",
-        "tr": "🇹🇷", "ae": "🇦🇪", "sa": "🇸🇦", "il": "🇮🇱",
-        "za": "🇿🇦", "eg": "🇪🇬", "ng": "🇳🇬", "ke": "🇰🇪",
-        "tw": "🇹🇼", "mo": "🇲🇴", "my": "🇲🇾", "th": "🇹🇭",
-        "vn": "🇻🇳", "ph": "🇵🇭", "id": "🇮🇩", "pk": "🇵🇰",
-        "bd": "🇧🇩", "kz": "🇰🇿", "uz": "🇺🇿"
+        "cn": "🇨🇳",
+        "us": "🇺🇸",
+        "hk": "🇭🇰",
+        "jp": "🇯🇵",
+        "kr": "🇰🇷",
+        "sg": "🇸🇬",
+        "uk": "🇬🇧",
+        "de": "🇩🇪",
+        "fr": "🇫🇷",
+        "ru": "🇷🇺",
+        "au": "🇦🇺",
+        "ca": "🇨🇦",
+        "in": "🇮🇳",
+        "br": "🇧🇷",
+        "mx": "🇲🇽",
+        "it": "🇮🇹",
+        "es": "🇪🇸",
+        "nl": "🇳🇱",
+        "se": "🇸🇪",
+        "no": "🇳🇴",
+        "fi": "🇫🇮",
+        "is": "🇮🇸",
+        "pl": "🇵🇱",
+        "ua": "🇺🇦",
+        "tr": "🇹🇷",
+        "ae": "🇦🇪",
+        "sa": "🇸🇦",
+        "il": "🇮🇱",
+        "za": "🇿🇦",
+        "eg": "🇪🇬",
+        "ng": "🇳🇬",
+        "ke": "🇰🇪",
+        "tw": "🇹🇼",
+        "mo": "🇲🇴",
+        "my": "🇲🇾",
+        "th": "🇹🇭",
+        "vn": "🇻🇳",
+        "ph": "🇵🇭",
+        "id": "🇮🇩",
+        "pk": "🇵🇰",
+        "bd": "🇧🇩",
+        "kz": "🇰🇿",
+        "uz": "🇺🇿",
     }
 
     # 操作系统图标映射
@@ -125,7 +158,7 @@ class NezhaPlugin(Star):
         "net_in_speed": "入站",
         "net_out_speed": "出站",
         "tcp_conn": "TCP连接",
-        "process_count": "进程数"
+        "process_count": "进程数",
     }
 
     # API 响应字段常量
@@ -213,10 +246,14 @@ class NezhaPlugin(Star):
 
         # 安全日志：不输出完整 API Token
         if self.api_token:
-            token_preview = self.api_token[:4] + "***" if len(self.api_token) >= 4 else "***"
+            token_preview = (
+                self.api_token[:4] + "***" if len(self.api_token) >= 4 else "***"
+            )
         else:
             token_preview = "未配置"
-        logger.info(f"哪吒探针插件已加载，面板地址: {self.base_url}，Token: {token_preview}")
+        logger.info(
+            f"哪吒探针插件已加载，面板地址: {self.base_url}，Token: {token_preview}"
+        )
 
     # ==================== 生命周期管理 ====================
 
@@ -241,8 +278,8 @@ class NezhaPlugin(Star):
                     timeout=self.request_timeout,
                     limits=httpx.Limits(
                         max_keepalive_connections=self.max_keepalive,
-                        max_connections=self.max_connections
-                    )
+                        max_connections=self.max_connections,
+                    ),
                 )
             return self._client
 
@@ -292,7 +329,9 @@ class NezhaPlugin(Star):
             有效的超时时间（秒）
         """
         try:
-            raw_timeout = self.config.get("request_timeout", self.DEFAULT_REQUEST_TIMEOUT)
+            raw_timeout = self.config.get(
+                "request_timeout", self.DEFAULT_REQUEST_TIMEOUT
+            )
             timeout = float(raw_timeout)
             if timeout > self.MIN_TIMEOUT:
                 return timeout
@@ -326,7 +365,10 @@ class NezhaPlugin(Star):
                 current_mtime = self.template_path.stat().st_mtime
                 self._template_last_check = now
 
-                if self._template_cache is None or self._template_mtime != current_mtime:
+                if (
+                    self._template_cache is None
+                    or self._template_mtime != current_mtime
+                ):
                     try:
                         with open(self.template_path, "r", encoding="utf-8") as f:
                             self._template_cache = f.read()
@@ -382,7 +424,9 @@ class NezhaPlugin(Star):
             if result is None:
                 last_error = "连接失败"
                 if attempt < self.MAX_RETRY_ATTEMPTS - 1:
-                    wait_time = (self.RETRY_BACKOFF_BASE ** attempt) + random.uniform(0, self.RETRY_JITTER)
+                    wait_time = (self.RETRY_BACKOFF_BASE**attempt) + random.uniform(
+                        0, self.RETRY_JITTER
+                    )
                     logger.debug(
                         f"获取服务器列表失败，{wait_time:.2f}s 后重试 "
                         f"(尝试 {attempt + 1}/{self.MAX_RETRY_ATTEMPTS})"
@@ -398,7 +442,9 @@ class NezhaPlugin(Star):
                 if self._is_retryable_error(error_msg):
                     last_error = error_msg
                     if attempt < self.MAX_RETRY_ATTEMPTS - 1:
-                        wait_time = (self.RETRY_BACKOFF_BASE ** attempt) + random.uniform(0, self.RETRY_JITTER)
+                        wait_time = (self.RETRY_BACKOFF_BASE**attempt) + random.uniform(
+                            0, self.RETRY_JITTER
+                        )
                         logger.debug(
                             f"获取服务器列表失败 (可重试): {error_msg}，"
                             f"{wait_time:.2f}s 后重试 (尝试 {attempt + 1}/{self.MAX_RETRY_ATTEMPTS})"
@@ -409,7 +455,9 @@ class NezhaPlugin(Star):
                 return None
 
             # 正常响应
-            servers = result.get(self.FIELD_DATA, []) if isinstance(result, dict) else result
+            servers = (
+                result.get(self.FIELD_DATA, []) if isinstance(result, dict) else result
+            )
             if isinstance(servers, list):
                 return servers
 
@@ -417,7 +465,9 @@ class NezhaPlugin(Star):
             logger.error(f"服务器数据格式异常: {type(servers)}")
             return []
 
-        logger.error(f"获取服务器列表失败，已重试 {self.MAX_RETRY_ATTEMPTS} 次: {last_error}")
+        logger.error(
+            f"获取服务器列表失败，已重试 {self.MAX_RETRY_ATTEMPTS} 次: {last_error}"
+        )
         return None
 
     @staticmethod
@@ -435,7 +485,7 @@ class NezhaPlugin(Star):
             "认证失败",
             "未配置",
             "响应格式错误",
-            "不支持的HTTP方法"
+            "不支持的HTTP方法",
         ]
         for keyword in non_retryable_keywords:
             if keyword in error_msg:
@@ -548,6 +598,7 @@ class NezhaPlugin(Star):
 
         try:
             from dateutil import parser
+
             last_time = parser.parse(last_active_str)
             if last_time.tzinfo is None:
                 last_time = last_time.replace(tzinfo=timezone.utc)
@@ -605,7 +656,7 @@ class NezhaPlugin(Star):
         method: str,
         endpoint: str,
         data: Optional[Dict[str, Any]] = None,
-        use_admin: bool = False
+        use_admin: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         发送 HTTP 请求到哪吒面板 API
@@ -638,7 +689,7 @@ class NezhaPlugin(Star):
         if use_admin and self.admin_token:
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.admin_token}"
+                "Authorization": f"Bearer {self.admin_token}",
             }
         else:
             headers = self._get_headers()
@@ -819,7 +870,9 @@ class NezhaPlugin(Star):
 
     # ==================== 模板数据准备 ====================
 
-    def _prepare_template_data(self, server_infos: List[ServerInfo]) -> List[Dict[str, Any]]:
+    def _prepare_template_data(
+        self, server_infos: List[ServerInfo]
+    ) -> List[Dict[str, Any]]:
         """
         准备模板渲染所需的数据
 
@@ -835,8 +888,8 @@ class NezhaPlugin(Star):
         for info in server_infos:
             data = info.to_dict()
             # 添加计算字段（使用 max(1, ...) 防止除零）
-            data["mem_percent"] = (info.mem_used / max(info.mem_total, 1) * 100)
-            data["disk_percent"] = (info.disk_used / max(info.disk_total, 1) * 100)
+            data["mem_percent"] = info.mem_used / max(info.mem_total, 1) * 100
+            data["disk_percent"] = info.disk_used / max(info.disk_total, 1) * 100
             data["os_icon"] = self._get_os_icon(info.platform)
             data["flag"] = self._get_country_flag(info.geoip_country)
             data["country_code"] = info.geoip_country.lower()
@@ -902,7 +955,9 @@ class NezhaPlugin(Star):
             lines.append(f"{status_icon} {info.name} - CPU: {info.cpu:.1f}%")
         yield event.plain_result("\n".join(lines))
 
-    async def _handle_detail(self, event: AstrMessageEvent, server_id: str) -> AsyncGenerator:
+    async def _handle_detail(
+        self, event: AstrMessageEvent, server_id: str
+    ) -> AsyncGenerator:
         """
         处理 /nezha detail <id> 命令 - 服务器详细信息
         """
@@ -919,7 +974,9 @@ class NezhaPlugin(Star):
             yield event.plain_result("📭 暂无服务器")
             return
 
-        server = next((s for s in servers if str(s.get(self.FIELD_ID)) == server_id), None)
+        server = next(
+            (s for s in servers if str(s.get(self.FIELD_ID)) == server_id), None
+        )
         if not server:
             yield event.plain_result(f"❌ 未找到 ID 为 {server_id} 的服务器")
             return
@@ -974,18 +1031,20 @@ class NezhaPlugin(Star):
                     "online": online_count,
                     "offline": offline_count,
                     "servers": server_data,
-                    "update_time": now
+                    "update_time": now,
                 },
                 options={
                     "full_page": True,
                     "type": "png",
                     "scale": "css",
-                    "timeout": 30000  # 30秒超时（毫秒）
-                }
+                    "timeout": 30000,  # 30秒超时（毫秒）
+                },
             )
 
             if not image_url:
-                yield event.plain_result("❌ 生成状态图片失败，请检查 HTML 模板是否完整")
+                yield event.plain_result(
+                    "❌ 生成状态图片失败，请检查 HTML 模板是否完整"
+                )
             else:
                 yield event.image_result(image_url)
         except asyncio.TimeoutError:
