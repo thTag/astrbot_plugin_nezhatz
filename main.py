@@ -2,7 +2,7 @@
 哪吒探针插件 (astrbot_plugin_nezhatz)
 
 用于查看哪吒监控站点的服务器状态等信息
-支持指令与LLM Tools调用
+支持指令调用
 基于哪吒监控 2.2.6 版本 API
 
 作者: 叹号大帝
@@ -10,7 +10,7 @@
 
 import asyncio
 import json
-from typing import Optional, Dict, List, Any, AsyncGenerator, Union
+from typing import Optional, Dict, List, Any, AsyncGenerator
 from datetime import datetime
 from pathlib import Path
 
@@ -399,160 +399,6 @@ class NezhaPlugin(Star):
         except Exception as e:
             logger.error(f"渲染图片失败: {e}")
             yield event.plain_result(f"❌ 渲染图片失败: {e}")
-
-    # ==================== LLM Tools ====================
-
-    @filter.llm_tool(
-        name="nezha_list_servers",
-        description="获取哪吒监控中所有服务器的列表和基本状态信息"
-    )
-    async def llm_list_servers(self) -> str:
-        servers = await self._fetch_servers()
-        if not servers:
-            return "获取服务器列表失败"
-        
-        lines = ["📊 服务器列表:"]
-        for svr in servers:
-            name = svr.get("name", "未命名")
-            is_online = self._is_online(svr)
-            status_icon = "🟢" if is_online else "🔴"
-            state = svr.get("state", {})
-            cpu = state.get("cpu", 0)
-            lines.append(f"{status_icon} {name} - CPU: {cpu:.1f}%")
-        return "\n".join(lines)
-
-    @filter.llm_tool(
-        name="nezha_get_server_detail",
-        description="获取指定服务器的详细信息"
-    )
-    async def llm_get_server_detail(self, server_id: str) -> str:
-        servers = await self._fetch_servers()
-        if not servers:
-            return "获取服务器详情失败"
-        
-        server = next((s for s in servers if str(s.get("id")) == server_id), None)
-        if not server:
-            return f"❌ 未找到 ID 为 {server_id} 的服务器"
-        
-        state = server.get("state", {})
-        host = server.get("host", {})
-        is_online = self._is_online(server)
-        lines = [
-            f"📋 {server.get('name', 'N/A')} 详情:",
-            f"状态: {'在线' if is_online else '离线'}",
-            f"CPU: {state.get('cpu', 0):.1f}%",
-            f"内存: {self._format_bytes(state.get('mem_used', 0))} / {self._format_bytes(host.get('mem_total', 0))}",
-            f"运行时间: {self._format_uptime(state.get('uptime', 0))}",
-        ]
-        return "\n".join(lines)
-
-    @filter.llm_tool(
-        name="nezha_server_status_summary",
-        description="获取所有服务器的状态概览"
-    )
-    async def llm_server_status_summary(self) -> str:
-        servers = await self._fetch_servers()
-        if not servers:
-            return "获取状态失败"
-        
-        total = len(servers)
-        online = sum(1 for s in servers if self._is_online(s))
-        total_cpu = sum(s.get("state", {}).get("cpu", 0) for s in servers)
-        avg_cpu = total_cpu / total if total > 0 else 0
-        return f"📊 服务器状态概览\n总计: {total} 台\n在线: {online} 台\n离线: {total - online} 台\n平均CPU: {avg_cpu:.1f}%"
-
-    @filter.llm_tool(
-        name="nezha_get_server_data",
-        description="获取服务器的实时数据指标"
-    )
-    async def llm_get_server_data(self, server_id: str) -> str:
-        """使用 asyncio.gather 并发获取多个指标"""
-        metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
-        
-        async def fetch_metric(metric: str) -> tuple[str, Union[float, str, None]]:
-            result = await self._make_request("GET", f"/api/v1/server/{server_id}/metrics?metric={metric}")
-            if result and "error" not in result:
-                data = result.get("data", {})
-                points = data.get("data_points", [])
-                if points:
-                    return (metric, points[-1].get("value", 0))
-                return (metric, None)
-            elif result and "error" in result:
-                return (metric, f"错误: {result['error']}")
-            return (metric, "获取失败")
-        
-        tasks = [fetch_metric(m) for m in metrics]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        result_data = {}
-        error_messages = []
-        for res in results:
-            if isinstance(res, tuple):
-                metric, value = res
-                result_data[metric] = value
-                if isinstance(value, str):
-                    error_messages.append(f"{metric}: {value}")
-            elif isinstance(res, Exception):
-                logger.warning(f"获取指标异常: {res}")
-        
-        lines = [f"📊 **服务器 {server_id} 实时数据**"]
-        
-        if error_messages:
-            lines.append("⚠️ 部分指标获取失败:")
-            lines.extend(f"  - {msg}" for msg in error_messages)
-            lines.append("")
-        
-        numeric_metrics = ["cpu", "memory", "disk", "net_in_speed", "net_out_speed", "tcp_conn", "process_count"]
-        for metric in numeric_metrics:
-            value = result_data.get(metric)
-            label = self._format_metric_label(metric)
-            if value is None:
-                lines.append(f"{label}: 暂无数据")
-            elif isinstance(value, str):
-                lines.append(f"{label}: {value}")
-            elif isinstance(value, (int, float)):
-                if metric in ["net_in_speed", "net_out_speed"]:
-                    lines.append(f"{label}: {self._format_bytes(value)}")
-                else:
-                    lines.append(f"{label}: {value}%")
-        
-        return "\n".join(lines)
-
-    @filter.llm_tool(
-        name="nezha_get_notification_groups",
-        description="获取所有通知组列表"
-    )
-    async def llm_get_notification_groups(self) -> str:
-        result = await self._make_request("GET", "/api/v1/notification-group")
-        if result and "error" not in result:
-            notifications = result.get("data", []) if isinstance(result, dict) else result
-            if isinstance(notifications, list):
-                if not notifications:
-                    return "📭 暂无通知组配置"
-                lines = ["📢 **通知组列表**"]
-                for ntf in notifications:
-                    lines.append(f"- {ntf.get('name', '未命名')} (类型: {ntf.get('type', 'N/A')}, 启用: {'✅' if ntf.get('enabled') else '❌'})")
-                return "\n".join(lines)
-            return "获取通知组失败：数据格式异常"
-        error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-        return f"获取通知组失败: {error_msg}"
-
-    @filter.llm_tool(
-        name="nezha_get_server_config",
-        description="获取指定服务器的配置信息"
-    )
-    async def llm_get_server_config(self, server_id: str) -> str:
-        result = await self._make_request("GET", f"/api/v1/server/config/{server_id}")
-        if result and "error" not in result:
-            config = result.get("data", {}) if isinstance(result, dict) else result
-            lines = [
-                f"⚙️ **服务器 {server_id} 配置**",
-                f"通知组: {config.get('notification_group_id', '未配置')}",
-                f"启用状态: {'✅' if config.get('enabled') else '❌'}",
-            ]
-            return "\n".join(lines)
-        error_msg = result.get("error", "未知错误") if result else "无法连接到面板"
-        return f"获取服务器配置失败: {error_msg}"
 
     async def terminate(self):
         logger.info("哪吒探针插件已卸载")
