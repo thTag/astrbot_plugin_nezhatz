@@ -233,7 +233,7 @@
         {% for server in servers %}
         <div class="server-card {% if not server.online %}offline{% endif %}">
             <div class="server-info">
-                <span class="flag-icon">{{ server.flag }}</span>
+                <span class="flag-icon fi fi-{{ server.country_code }}"></span>
                 <span class="server-name">{{ server.name }}</span>
                 {% if server.os_icon %}
                 <span class="os-icon {{ server.os_icon }}"></span>
