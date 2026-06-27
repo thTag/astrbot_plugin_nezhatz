@@ -148,7 +148,6 @@
         font-size: 17px;
         transition: color 0.2s ease;
     }
-    /* 颜色规则：< 70% 绿色，70%-90% 黄色，>= 90% 红色 */
     .resource-item .value.green { color: #4ade80; }
     .resource-item .value.yellow { color: #fbbf24; }
     .resource-item .value.red { color: #f87171; }
@@ -234,7 +233,7 @@
         {% for server in servers %}
         <div class="server-card {% if not server.online %}offline{% endif %}">
             <div class="server-info">
-                <span class="flag-icon fi fi-{{ server.country_code|lower }}"></span>
+                <span class="flag-icon">{{ server.flag }}</span>
                 <span class="server-name">{{ server.name }}</span>
                 {% if server.os_icon %}
                 <span class="os-icon {{ server.os_icon }}"></span>
@@ -242,16 +241,13 @@
             </div>
 
             <div class="server-resources">
-                <!-- CPU：根据数值设置颜色类 -->
                 {% set cpu = server.cpu|default(0) %}
                 <span class="resource-item">CPU <span class="value {% if cpu >= 90 %}red{% elif cpu >= 70 %}yellow{% else %}green{% endif %}">{{ '%.1f'|format(cpu) }}%</span></span>
 
-                <!-- 内存：根据数值设置颜色类 -->
-                {% set mem = server.mem|default(0) %}
+                {% set mem = server.mem_percent|default(0) %}
                 <span class="resource-item">内存 <span class="value {% if mem >= 90 %}red{% elif mem >= 70 %}yellow{% else %}green{% endif %}">{{ '%.1f'|format(mem) }}%</span></span>
 
-                <!-- 磁盘：根据数值设置颜色类 -->
-                {% set disk = server.disk|default(0) %}
+                {% set disk = server.disk_percent|default(0) %}
                 <span class="resource-item">磁盘 <span class="value {% if disk >= 90 %}red{% elif disk >= 70 %}yellow{% else %}green{% endif %}">{{ '%.1f'|format(disk) }}%</span></span>
             </div>
 
