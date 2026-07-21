@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务器详情 - {{ server.name }}</title>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/font-logos@1/assets/font-logos.css">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        width: 100%;
+        min-height: 100vh;
+        background: #0a0a0a;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #e8edf5;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 30px;
+    }
+    .container {
+        width: 700px;
+        max-width: 100%;
+        background: #111111;
+        border-radius: 32px;
+        padding: 32px 36px 26px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: #4a5a7a;
+        text-decoration: none;
+        font-size: 14px;
+    }
+    .back-link:hover { color: #6a8aaa; }
+    .header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .flag-icon { font-size: 40px; line-height: 1; }
+    .header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #ffffff 60%, #8888cc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 18px 6px 14px;
+        border-radius: 40px;
+        font-size: 15px;
+        font-weight: 600;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+    .status-badge.online {
+        background: rgba(74, 222, 128, 0.12);
+        color: #4ade80;
+        border: 1px solid rgba(74, 222, 128, 0.1);
+    }
+    .status-badge.offline {
+        background: rgba(248, 113, 113, 0.08);
+        color: #f87171;
+        border: 1px solid rgba(248, 113, 113, 0.1);
+    }
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .status-dot.online { background: #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.25); }
+    .status-dot.offline { background: #f87171; box-shadow: 0 0 10px rgba(248, 113, 113, 0.2); }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 16px;
+        padding: 20px 24px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 20px;
+    }
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .info-item .label { color: #6a7a9a; font-size: 14px; }
+    .info-item .value { color: #e8edf5; font-weight: 500; font-size: 15px; }
+
+    .progress-section {
+        margin-top: 8px;
+    }
+    .progress-item {
+        margin-bottom: 14px;
+    }
+    .progress-item .label-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+        color: #b0c4e0;
+        margin-bottom: 4px;
+    }
+    .progress-item .label-row .val { font-weight: 600; }
+    .progress-track {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .progress-track .bar {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s;
+    }
+    .bar.green { background: linear-gradient(90deg, #4ade80, #22d3ee); }
+    .bar.yellow { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+    .bar.red { background: linear-gradient(90deg, #f87171, #ef4444); }
+
+    .footer {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: flex-end;
+        font-size: 13px;
+        color: #4a5a7a;
+    }
+    @media (max-width: 600px) {
+        .info-grid { grid-template-columns: 1fr; }
+        .header { flex-wrap: wrap; }
+        .header h1 { font-size: 22px; }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <span class="flag-icon fi fi-{{ server.country_code }}"></span>
+        <h1>{{ server.name }}</h1>
+        <span class="status-badge {{ 'online' if server.online else 'offline' }}">
+            <span class="status-dot {{ 'online' if server.online else 'offline' }}"></span>
+            {{ '在线' if server.online else '离线' }}
+        </span>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-item"><span class="label">系统</span><span class="value">{{ server.platform }} {{ server.platform_version }}</span></div>
+        <div class="info-item"><span class="label">运行时间</span><span class="value">{{ server.uptime }}</span></div>
+        <div class="info-item"><span class="label">入站流量</span><span class="value">{{ server.net_in }}</span></div>
+        <div class="info-item"><span class="label">出站流量</span><span class="value">{{ server.net_out }}</span></div>
+        <div class="info-item"><span class="label">最后活跃</span><span class="value">{{ server.last_active }}</span></div>
+        <div class="info-item"><span class="label">CPU 核心</span><span class="value">{{ server.cpu_cores|default('N/A') }}</span></div>
+    </div>
+
+    <div class="progress-section">
+        <div class="progress-item">
+            <div class="label-row"><span>CPU</span><span class="val">{{ '%.1f'|format(server.cpu) }}%</span></div>
+            <div class="progress-track"><div class="bar {% if server.cpu >= 90 %}red{% elif server.cpu >= 70 %}yellow{% else %}green{% endif %}" style="width: {{ server.cpu }}%;"></div></div>
+        </div>
+        <div class="progress-item">
+            <div class="label-row"><span>内存</span><span class="val">{{ '%.1f'|format(server.mem_percent) }}% ({{ server.mem_used }} / {{ server.mem_total }})</span></div>
+            <div class="progress-track"><div class="bar {% if server.mem_percent >= 90 %}red{% elif server.mem_percent >= 70 %}yellow{% else %}green{% endif %}" style="width: {{ server.mem_percent }}%;"></div></div>
+        </div>
+        <div class="progress-item">
+            <div class="label-row"><span>磁盘</span><span class="val">{{ '%.1f'|format(server.disk_percent) }}% ({{ server.disk_used }} / {{ server.disk_total }})</span></div>
+            <div class="progress-track"><div class="bar {% if server.disk_percent >= 90 %}red{% elif server.disk_percent >= 70 %}yellow{% else %}green{% endif %}" style="width: {{ server.disk_percent }}%;"></div></div>
+        </div>
+    </div>
+
+    <div class="footer">⚡ 哪吒探针 · 更新于 {{ update_time }}</div>
+</div>
+</body>
+</html>

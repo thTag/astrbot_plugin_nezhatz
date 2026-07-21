@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>历史趋势 - {{ server_name }}</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        width: 100%;
+        min-height: 100vh;
+        background: #0a0a0a;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #e8edf5;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 30px;
+    }
+    .container {
+        width: 720px;
+        max-width: 100%;
+        background: #111111;
+        border-radius: 32px;
+        padding: 32px 36px 26px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .header h1 {
+        font-size: 22px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #ffffff 60%, #8888cc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .period-badge {
+        background: rgba(255,255,255,0.05);
+        padding: 4px 16px;
+        border-radius: 40px;
+        font-size: 14px;
+        color: #6a7a9a;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        background: rgba(255,255,255,0.02);
+        border-radius: 16px;
+        padding: 16px 20px;
+        border: 1px solid rgba(255,255,255,0.05);
+        margin-bottom: 24px;
+    }
+    .stats-grid .item .label { font-size: 12px; color: #6a7a9a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stats-grid .item .value { font-size: 20px; font-weight: 700; }
+    .stats-grid .item .value.green { color: #4ade80; }
+    .stats-grid .item .value.yellow { color: #fbbf24; }
+    .stats-grid .item .value.red { color: #f87171; }
+    .stats-grid .item .value.blue { color: #60a5fa; }
+
+    .chart-container {
+        background: rgba(255,255,255,0.02);
+        border-radius: 16px;
+        padding: 20px 24px 16px;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .chart-svg {
+        width: 100%;
+        height: 160px;
+    }
+    .chart-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #4a5a7a;
+        margin-top: 6px;
+    }
+
+    .footer {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        display: flex;
+        justify-content: flex-end;
+        font-size: 13px;
+        color: #4a5a7a;
+    }
+    @media (max-width: 600px) {
+        .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📈 {{ server_name }} - {{ metric_name }}</h1>
+        <span class="period-badge">{{ period_label }}</span>
+    </div>
+
+    <div class="stats-grid">
+        <div class="item"><div class="label">当前</div><div class="value blue">{{ current_value }}</div></div>
+        <div class="item"><div class="label">最高</div><div class="value red">{{ max_value }} <span style="font-size:12px;color:#4a5a7a;font-weight:400;">({{ max_time }})</span></div></div>
+        <div class="item"><div class="label">最低</div><div class="value green">{{ min_value }} <span style="font-size:12px;color:#4a5a7a;font-weight:400;">({{ min_time }})</span></div></div>
+        <div class="item"><div class="label">平均</div><div class="value yellow">{{ avg_value }}</div></div>
+    </div>
+
+    <div class="chart-container">
+        <svg class="chart-svg" viewBox="0 0 600 140" preserveAspectRatio="xMidYMid meet">
+            <polyline
+                points="{{ points }}"
+                fill="none"
+                stroke="url(#grad)"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            />
+            <defs>
+                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#60a5fa;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+        </svg>
+        <div class="chart-labels">
+            <span>{{ start_time }}</span>
+            <span>{{ end_time }}</span>
+        </div>
+    </div>
+
+    <div class="footer">⚡ 哪吒探针 · 更新于 {{ update_time }}</div>
+</div>
+</body>
+</html>
