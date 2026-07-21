@@ -617,6 +617,13 @@ class NezhaPlugin(Star):
             server_data.append(data)
         return server_data
 
+    def _format_metric_value(self, value: float, metric: str) -> str:
+        if metric in ("net_in_transfer", "net_out_transfer", "disk"):
+            return self._format_bytes(int(value))
+        if metric == "uptime":
+            return self._format_uptime(int(value))
+        return f"{value:.2f}{self.METRIC_UNITS.get(metric, '')}"
+
     async def _fetch_services(self) -> Optional[List[Dict[str, Any]]]:
         try:
             result = await self._make_request("GET", "/api/v1/service")
@@ -705,9 +712,9 @@ class NezhaPlugin(Star):
 
     def _parse_service_status(self, status: int) -> tuple[str, str]:
         if status == self.SERVICE_STATUS_ONLINE:
-            return "🟢", "在线"
+            return "🟢", "正常"
         elif status == self.SERVICE_STATUS_OFFLINE:
-            return "🔴", "离线"
+            return "🔴", "异常"
         else:
             return "⚪", "未知"
 
@@ -936,7 +943,7 @@ class NezhaPlugin(Star):
             total_avg_delay += avg_delay
 
             status_class = "online" if up_percent >= 95 else "offline" if up_percent >= 50 else "warning"
-            status_text = "在线" if up_percent >= 95 else "异常" if up_percent >= 50 else "离线"
+            status_text = "正常" if up_percent >= 95 else "异常" if up_percent >= 50 else "异常"
 
             server_items.append({
                 "server_name": svr.get("server_name", "未知服务器"),
@@ -950,7 +957,7 @@ class NezhaPlugin(Star):
         overall_up_percent = (total_up / total_checks * 100) if total_checks > 0 else 0
         overall_avg_delay = f"{total_avg_delay / len(servers):.1f}ms" if servers else "N/A"
 
-        overall_status_text = "在线" if overall_up_percent >= 95 else "异常" if overall_up_percent >= 50 else "离线"
+        overall_status_text = "正常" if overall_up_percent >= 95 else "异常" if overall_up_percent >= 50 else "异常"
         overall_status_class = "online" if overall_up_percent >= 95 else "offline" if overall_up_percent >= 50 else "unknown"
 
         t2i_data = {
@@ -1007,10 +1014,13 @@ class NezhaPlugin(Star):
     async def _handle_history(self, event: AstrMessageEvent, server_id: int, metric: str, period: str) -> AsyncGenerator:
         servers = await self._fetch_servers()
         server_name = f"ID:{server_id}"
+        disk_total = None
         if servers:
             for s in servers:
                 if s.get(self.FIELD_ID) == server_id:
                     server_name = s.get(self.FIELD_NAME, server_name)
+                    host = s.get(self.FIELD_HOST, {})
+                    disk_total = host.get(self.FIELD_DISK_TOTAL)
                     break
 
         data = await self._fetch_server_metrics(server_id, metric, period)
@@ -1045,12 +1055,23 @@ class NezhaPlugin(Star):
             ts = point.get("ts", 0)
             val = point.get("value", 0)
             if val is not None:
-                values.append(float(val))
+                val = float(val)
+                if metric == "disk" and disk_total and disk_total > 0:
+                    val = (val / disk_total) * 100
+                values.append(val)
                 timestamps.append(ts)
 
         if not values:
             yield event.plain_result(f"📭 服务器 {server_name} 的 {metric} 数据为空")
             return
+
+        # 削峰：将超出均值 + 3倍标准差的值截断（仅用于图表显示，统计值使用原始数据）
+        clipped_values = values.copy()
+        if len(clipped_values) > 2:
+            mean = sum(clipped_values) / len(clipped_values)
+            std = (sum((v - mean) ** 2 for v in clipped_values) / len(clipped_values)) ** 0.5
+            upper_limit = mean + 3 * std
+            clipped_values = [min(v, upper_limit) for v in clipped_values]
 
         current = values[-1] if values else 0
         max_val = max(values) if values else 0
@@ -1079,20 +1100,20 @@ class NezhaPlugin(Star):
         period_names = {"1d": "过去24小时", "7d": "过去7天", "30d": "过去30天"}
 
         def format_metric_value(value: float) -> str:
-            if metric in ("net_in_transfer", "net_out_transfer"):
+            if metric in ("net_in_transfer", "net_out_transfer", "disk"):
                 return self._format_bytes(int(value))
             if metric == "uptime":
                 return self._format_uptime(int(value))
             return f"{value:.2f}{self.METRIC_UNITS.get(metric, '')}"
 
-        # 生成 SVG 折线图数据点
-        if len(values) > 1:
-            min_val_plot = min(values)
-            max_val_plot = max(values)
+        # 使用削峰后的数据生成 SVG 点
+        if len(clipped_values) > 1:
+            min_val_plot = min(clipped_values)
+            max_val_plot = max(clipped_values)
             range_val_plot = max_val_plot - min_val_plot if max_val_plot != min_val_plot else 1
             points = []
-            for i, v in enumerate(values):
-                x = (i / max(len(values) - 1, 1)) * 600
+            for i, v in enumerate(clipped_values):
+                x = (i / max(len(clipped_values) - 1, 1)) * 600
                 y = 140 - ((v - min_val_plot) / range_val_plot) * 120 - 10
                 points.append(f"{x:.1f},{y:.1f}")
             points_str = " ".join(points)
