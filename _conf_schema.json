@@ -50,5 +50,12 @@
         "hint": "同时请求多个服务器时的并发限制",
         "default": 50,
         "minimum": 1
+    },
+    "output_mode": {
+        "type": "string",
+        "description": "输出格式",
+        "hint": "t2i: 渲染为图片（通用）, markdown: 输出文本（适合QQ官方机器人）",
+        "default": "t2i",
+        "enum": ["t2i", "markdown"]
     }
 }
