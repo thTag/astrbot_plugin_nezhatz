@@ -667,23 +667,53 @@ class NezhaPlugin(Star):
 
             data = result.get(self.FIELD_DATA, {})
 
-            if isinstance(data, str):
-                logger.warning(f"服务监控API返回字符串，可能是面板版本不支持: {data[:100]}")
-                return []
+            if isinstance(data, dict) and "services" in data:
+                services_dict = data["services"]
+                result_list = []
+                for service_id, svc_data in services_dict.items():
+                    if not isinstance(svc_data, dict):
+                        continue
+
+                    up_list = svc_data.get("up", [])
+                    down_list = svc_data.get("down", [])
+                    delay_list = svc_data.get("delay", [])
+
+                    total_up = sum(up_list) if up_list else 0
+                    total_down = sum(down_list) if down_list else 0
+                    total_checks = total_up + total_down
+
+                    up_percent = (total_up / total_checks * 100) if total_checks > 0 else 0
+                    avg_delay = sum(delay_list) / len(delay_list) if delay_list else 0
+
+                    current_up = svc_data.get("current_up", 0)
+                    current_down = svc_data.get("current_down", 0)
+                    if current_up > 0 and current_down == 0:
+                        status = self.SERVICE_STATUS_ONLINE
+                    elif current_down > 0:
+                        status = self.SERVICE_STATUS_OFFLINE
+                    else:
+                        status = self.SERVICE_STATUS_UNKNOWN
+
+                    result_list.append({
+                        "id": int(service_id),
+                        "name": svc_data.get("service_name", "未命名"),
+                        "status": status,
+                        "avg_delay": avg_delay,
+                        "up_percent": up_percent,
+                        "current_up": current_up,
+                        "current_down": current_down,
+                        "total_up": total_up,
+                        "total_down": total_down,
+                    })
+                return result_list
 
             if isinstance(data, list):
                 return [item for item in data if isinstance(item, dict)]
 
             if isinstance(data, dict):
-                if "services" in data and isinstance(data["services"], list):
-                    return [item for item in data["services"] if isinstance(item, dict)]
-
                 values = list(data.values())
                 if values and all(isinstance(v, dict) for v in values):
                     return values
-
-                if not data:
-                    return []
 
             logger.warning(f"服务监控数据格式异常: {type(data)}")
             return []
@@ -1061,28 +1091,8 @@ class NezhaPlugin(Star):
             yield event.plain_result("📭 暂无服务监控")
             return
 
-        t2i_data = None
-        if self.output_mode == "t2i":
-            service_data = []
-            for svc in services:
-                if not isinstance(svc, dict):
-                    continue
-                icon, status_text = self._parse_service_status(svc.get("status", self.SERVICE_STATUS_UNKNOWN))
-                service_data.append({
-                    "name": svc.get("name", "未命名"),
-                    "id": svc.get("id", "N/A"),
-                    "status": status_text,
-                    "status_icon": icon,
-                    "avg_delay": svc.get("avg_delay", 0),
-                    "up_percent": svc.get("up_percent", 0),
-                })
-            t2i_data = {
-                "services": service_data,
-                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-
         markdown_content = self._format_service_list_markdown(services)
-        async for result in self._send_result(event, t2i_data, markdown_content):
+        async for result in self._send_result(event, None, markdown_content, force_mode="markdown"):
             yield result
 
     async def _handle_service_detail(self, event: AstrMessageEvent, service_id: str) -> AsyncGenerator:
