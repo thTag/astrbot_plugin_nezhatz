@@ -660,10 +660,22 @@ class NezhaPlugin(Star):
         return "".join(result)
 
     async def _fetch_services(self) -> Optional[List[Dict[str, Any]]]:
-        result = await self._make_request("GET", "/api/v1/service/list")
+        result = await self._make_request("GET", "/api/v1/service")
         if result is None or self.FIELD_ERROR in result:
             return None
-        return result.get(self.FIELD_DATA, [])
+
+        data = result.get(self.FIELD_DATA, {})
+
+        if isinstance(data, list):
+            return data
+        elif isinstance(data, dict):
+            if "services" in data:
+                return data["services"]
+            values = list(data.values())
+            if values and isinstance(values[0], dict):
+                return values
+            return []
+        return []
 
     async def _fetch_service_history(self, service_id: int, period: str = "1d") -> Optional[Dict[str, Any]]:
         result = await self._make_request("GET", f"/api/v1/service/{service_id}/history?period={period}")
@@ -680,6 +692,7 @@ class NezhaPlugin(Star):
         if self.FIELD_ERROR in result:
             error_msg = result[self.FIELD_ERROR]
             if "tsdb" in error_msg.lower() or "timescale" in error_msg.lower():
+                logger.error(f"TSDB 未启用，无法获取历史指标: {error_msg}")
                 return {"error": "tsdb_not_enabled", "message": error_msg}
             return None
 
@@ -872,7 +885,9 @@ class NezhaPlugin(Star):
 
         sub_cmd = parts[1].lower()
 
-        if sub_cmd == "list":
+        if sub_cmd == "help":
+            yield event.plain_result(self.HELP_TEXT)
+        elif sub_cmd == "list":
             async for result in self._handle_list(event):
                 yield result
         elif sub_cmd == "status":
@@ -1024,9 +1039,30 @@ class NezhaPlugin(Star):
         if services is None:
             yield event.plain_result("❌ 获取服务监控列表失败，请检查面板配置和 API Token 权限")
             return
+        if not services:
+            yield event.plain_result("📭 暂无服务监控")
+            return
+
+        t2i_data = None
+        if self.output_mode == "t2i":
+            service_data = []
+            for svc in services:
+                icon, status_text = self._parse_service_status(svc.get("status", self.SERVICE_STATUS_UNKNOWN))
+                service_data.append({
+                    "name": svc.get("name", "未命名"),
+                    "id": svc.get("id", "N/A"),
+                    "status": status_text,
+                    "status_icon": icon,
+                    "avg_delay": svc.get("avg_delay", 0),
+                    "up_percent": svc.get("up_percent", 0),
+                })
+            t2i_data = {
+                "services": service_data,
+                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
 
         markdown_content = self._format_service_list_markdown(services)
-        async for result in self._send_result(event, None, markdown_content):
+        async for result in self._send_result(event, t2i_data, markdown_content):
             yield result
 
     async def _handle_service_detail(self, event: AstrMessageEvent, service_id: str) -> AsyncGenerator:
@@ -1159,4 +1195,3 @@ class NezhaPlugin(Star):
 
         async for result in self._send_result(event, None, markdown_content):
             yield result
-    
