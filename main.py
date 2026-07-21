@@ -50,7 +50,7 @@ class ServerInfo:
     "astrbot_plugin_nezhatz",
     "叹号大帝",
     "哪吒探针 - 查看哪吒监控站点服务器状态",
-    "1.1.0",
+    "1.2.0",
     "https://github.com/thTag/astrbot_plugin_nezhatz",
 )
 class NezhaPlugin(Star):
@@ -78,14 +78,13 @@ class NezhaPlugin(Star):
     HELP_TEXT = (
         "📖 **哪吒探针使用帮助**\n\n"
         "**服务器查询**\n"
-        "`/nezha list` - 列出所有服务器\n"
-        "`/nezha detail <id>` - 查看服务器详情\n"
-        "`/nezha status` - 查看状态概览（图片）\n\n"
+        "`/nezha status` - 查看服务器状态概览（图片）\n"
+        "`/nezha detail <id>` - 查看服务器详情（图片）\n\n"
         "**服务监控**\n"
-        "`/nezha service list` - 列出所有服务监控\n"
-        "`/nezha service detail <id>` - 查看服务详情\n\n"
+        "`/nezha service` - 查看服务监控列表（图片）\n"
+        "`/nezha service detail <id>` - 查看服务详情（图片）\n\n"
         "**历史指标**\n"
-        "`/nezha history <id> <指标> [周期]` - 查看历史趋势\n"
+        "`/nezha history <id> <指标> [周期]` - 查看历史趋势（图片）\n"
         "  指标: cpu, memory, disk, load1, tcp_conn, process_count...\n"
         "  周期: 1d, 7d, 30d (默认 1d)\n\n"
         "📌 示例: `/nezha history 1 cpu 1d`"
@@ -158,9 +157,6 @@ class NezhaPlugin(Star):
         self.api_token = self.config.get("api_token", "")
         self.admin_token = self.config.get("admin_token", "")
         self.verify_ssl = self.config.get("verify_ssl", True)
-        self.output_mode = self.config.get("output_mode", "t2i")
-        if self.output_mode not in ("t2i", "markdown"):
-            self.output_mode = "t2i"
 
         self._check_dependencies()
 
@@ -173,19 +169,23 @@ class NezhaPlugin(Star):
         self.max_connections = self.config.get("max_connections", self.MAX_HTTP_CONNECTIONS)
 
         data_dir = StarTools.get_data_dir()
-        custom_template = data_dir / "model" / "sysinfo.html"
-        if custom_template.exists():
-            self.template_path = custom_template
-        else:
-            self.template_path = Path(__file__).parent / "model" / "sysinfo.html"
+        self.model_dir = data_dir / "model"
+        if not self.model_dir.exists():
+            self.model_dir = Path(__file__).parent / "model"
 
-        if not self.template_path.exists():
-            logger.error(f"默认模板文件不存在: {self.template_path}")
+        self.template_paths = {
+            "status": self.model_dir / "sysinfo.html",
+            "server_detail": self.model_dir / "server_detail.html",
+            "service_list": self.model_dir / "service_list.html",
+            "service_detail": self.model_dir / "service_detail.html",
+            "history": self.model_dir / "history.html",
+        }
 
-        self._template_cache: Optional[str] = None
-        self._template_mtime: Optional[float] = None
-        self._template_last_check: float = 0.0
-        self._template_check_interval = 60.0
+        for name, path in self.template_paths.items():
+            if not path.exists():
+                logger.error(f"模板文件不存在: {path}")
+
+        self._template_cache: Dict[str, tuple[float, str]] = {}
         self._template_lock = asyncio.Lock()
 
         self._client: Optional[httpx.AsyncClient] = None
@@ -200,7 +200,7 @@ class NezhaPlugin(Star):
             token_preview = self.api_token[:4] + "***" if len(self.api_token) >= 4 else "***"
         else:
             token_preview = "未配置"
-        logger.info(f"哪吒探针插件 v1.1.0 已加载，面板: {self.base_url}，输出模式: {self.output_mode}")
+        logger.info(f"哪吒探针插件 v1.2.0 已加载，面板: {self.base_url}")
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         if self._shutting_down:
@@ -227,8 +227,7 @@ class NezhaPlugin(Star):
                 self._client = None
 
         async with self._template_lock:
-            self._template_cache = None
-            self._template_mtime = None
+            self._template_cache.clear()
 
         async with self._servers_cache_lock:
             self._servers_cache = None
@@ -253,28 +252,29 @@ class NezhaPlugin(Star):
             logger.warning("request_timeout 配置无效，使用默认值")
         return self.DEFAULT_REQUEST_TIMEOUT
 
-    async def _load_template(self) -> str:
+    async def _load_template(self, template_name: str) -> str:
         async with self._template_lock:
-            if not self.template_path or not self.template_path.exists():
-                logger.error(f"模板文件不存在: {self.template_path}")
-                return "<h1>模板加载失败</h1>"
+            path = self.template_paths.get(template_name)
+            if not path or not path.exists():
+                logger.error(f"模板文件不存在: {path}")
+                return f"<h1>模板 {template_name} 加载失败</h1>"
 
             now = time.time()
-            if now - self._template_last_check >= self._template_check_interval:
-                current_mtime = self.template_path.stat().st_mtime
-                self._template_last_check = now
+            cache_entry = self._template_cache.get(template_name)
+            if cache_entry:
+                cached_time, cached_content = cache_entry
+                if now - cached_time < 60.0:
+                    return cached_content
 
-                if self._template_cache is None or self._template_mtime != current_mtime:
-                    try:
-                        with open(self.template_path, "r", encoding="utf-8") as f:
-                            self._template_cache = f.read()
-                            self._template_mtime = current_mtime
-                            logger.debug("模板已重新加载")
-                    except Exception as e:
-                        logger.error(f"加载模板失败: {e}")
-                        return "<h1>模板加载失败</h1>"
-
-            return self._template_cache or "<h1>模板加载失败</h1>"
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    self._template_cache[template_name] = (now, content)
+                    logger.debug(f"模板已重新加载: {template_name}")
+                    return content
+            except Exception as e:
+                logger.error(f"加载模板失败 {template_name}: {e}")
+                return f"<h1>模板加载失败: {template_name}</h1>"
 
     async def _get_cached_servers(self) -> Optional[List[Dict[str, Any]]]:
         async with self._servers_cache_lock:
@@ -605,12 +605,7 @@ class NezhaPlugin(Star):
             hours = (seconds % self.SECONDS_PER_DAY) // self.SECONDS_PER_HOUR
             return f"{days}天 {hours}小时"
 
-    def _generate_progress_bar(self, percent: float, width: int = 10) -> str:
-        filled = int(round(max(0, min(100, percent)) / 100 * width))
-        empty = width - filled
-        return "█" * filled + "░" * empty
-
-    def _prepare_template_data(self, server_infos: List[ServerInfo]) -> List[Dict[str, Any]]:
+    def _prepare_server_data(self, server_infos: List[ServerInfo]) -> List[Dict[str, Any]]:
         server_data = []
         for info in server_infos:
             data = info.to_dict()
@@ -621,43 +616,6 @@ class NezhaPlugin(Star):
             data["country_code"] = info.geoip_country.lower()
             server_data.append(data)
         return server_data
-
-    def _format_metric_value(self, value: float, metric: str) -> str:
-        unit = self.METRIC_UNITS.get(metric, "")
-        if metric in ("net_in_transfer", "net_out_transfer"):
-            return self._format_bytes(int(value))
-        if metric == "uptime":
-            return self._format_uptime(int(value))
-        return f"{value:.2f}{unit}"
-
-    def _generate_sparkline(self, values: List[float], width: int = 30) -> str:
-        if not values or len(values) < 2:
-            return "数据不足"
-
-        if len(values) > width:
-            step = len(values) / width
-            sampled = []
-            for i in range(width):
-                idx = int(i * step)
-                sampled.append(values[idx])
-            values = sampled
-
-        min_val = min(values)
-        max_val = max(values)
-        range_val = max_val - min_val
-
-        if range_val == 0:
-            return "▁" * len(values)
-
-        bars = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-        result = []
-        for v in values:
-            normalized = (v - min_val) / range_val
-            idx = int(normalized * 7)
-            idx = max(0, min(7, idx))
-            result.append(bars[idx])
-
-        return "".join(result)
 
     async def _fetch_services(self) -> Optional[List[Dict[str, Any]]]:
         try:
@@ -753,174 +711,31 @@ class NezhaPlugin(Star):
         else:
             return "⚪", "未知"
 
-    def _format_server_list_markdown(self, servers: List[Dict[str, Any]]) -> str:
-        if not servers:
-            return "📭 暂无服务器"
-
-        lines = ["## 📊 服务器列表\n"]
-        for svr in servers:
-            info = self._parse_server(svr)
-            status_icon = "🟢" if info.online else "🔴"
-            cpu_bar = self._generate_progress_bar(info.cpu, 8)
-            lines.append(f"**{status_icon} {info.name}**  CPU: `{info.cpu:.1f}%` {cpu_bar}")
-        return "\n".join(lines)
-
-    def _format_server_detail_markdown(self, info: ServerInfo) -> str:
-        mem_percent = info.mem_used / max(info.mem_total, 1) * 100
-        disk_percent = info.disk_used / max(info.disk_total, 1) * 100
-
-        mem_bar = self._generate_progress_bar(mem_percent, 10)
-        disk_bar = self._generate_progress_bar(disk_percent, 10)
-
-        return f"""## 📋 {info.name} 详细信息
-
-| 项目 | 信息 |
-|------|------|
-| **状态** | {'🟢 在线' if info.online else '🔴 离线'} |
-| **系统** | {info.platform} {info.platform_version} |
-| **CPU** | `{info.cpu:.1f}%` |
-| **内存** | `{self._format_bytes(info.mem_used)}` / `{self._format_bytes(info.mem_total)}` {mem_bar} |
-| **磁盘** | `{self._format_bytes(info.disk_used)}` / `{self._format_bytes(info.disk_total)}` {disk_bar} |
-| **入站流量** | `{self._format_bytes(info.net_in_transfer)}` |
-| **出站流量** | `{self._format_bytes(info.net_out_transfer)}` |
-| **运行时间** | `{self._format_uptime(info.uptime)}` |
-| **最后活跃** | `{info.last_active}` |
-"""
-
-    def _format_service_list_markdown(self, services: List[Dict[str, Any]]) -> str:
-        if not services:
-            return "📭 暂无服务监控"
-
-        lines = ["## 📊 服务监控列表\n"]
-        for svc in services:
-            if not isinstance(svc, dict):
-                logger.warning(f"跳过非字典服务数据: {svc}")
-                continue
-
-            icon, status_text = self._parse_service_status(svc.get("status", self.SERVICE_STATUS_UNKNOWN))
-            name = svc.get("name", "未命名")
-            avg_delay = svc.get("avg_delay", 0)
-            up_percent = svc.get("up_percent", 0)
-            svc_id = svc.get("id", "N/A")
-
-            delay_str = f"{avg_delay:.1f}ms" if avg_delay > 0 else "N/A"
-            bar = self._generate_progress_bar(up_percent, 10)
-
-            lines.append(f"**{icon} {name}** (ID: `{svc_id}`)\n  {bar} 可用率: `{up_percent:.2f}%` | 延迟: `{delay_str}`")
-        return "\n".join(lines)
-
-    def _format_service_detail_markdown(self, service_data: Dict[str, Any]) -> str:
-        service_name = service_data.get("service_name", "未命名")
-        servers = service_data.get("servers", [])
-
-        lines = [f"## 📋 服务监控详情 - {service_name}\n"]
-
-        if not servers:
-            lines.append("📭 暂无关联服务器数据")
-            return "\n".join(lines)
-
-        lines.append("| 服务器 | 可用率 | 延迟 | 状态 |")
-        lines.append("|--------|--------|------|------|")
-
-        total_up = 0
-        total_down = 0
-        total_avg_delay = 0
-
-        for svr in servers:
-            stats = svr.get("stats", {})
-            up = stats.get("total_up", 0)
-            down = stats.get("total_down", 0)
-            avg_delay = stats.get("avg_delay", 0)
-            up_percent = stats.get("up_percent", 0)
-
-            total_up += up
-            total_down += down
-            total_avg_delay += avg_delay
-
-            server_name = svr.get("server_name", "未知服务器")
-            delay_str = f"{avg_delay:.1f}ms" if avg_delay > 0 else "N/A"
-            status_icon = "⚠️" if up_percent < 95 else "✅"
-            lines.append(f"| {server_name} | `{up_percent:.2f}%` | `{delay_str}` | {status_icon} |")
-
-        total_checks = total_up + total_down
-        if total_checks > 0:
-            overall_up_percent = (total_up / total_checks) * 100
-            avg_delay_all = total_avg_delay / len(servers) if servers else 0
-            lines.extend([
-                "",
-                f"**📊 整体统计**",
-                f"- 总可用率: `{overall_up_percent:.2f}%`",
-                f"- 平均延迟: `{avg_delay_all:.1f}ms`",
-                f"- 总监控次数: `{total_checks}`",
-            ])
-
-        return "\n".join(lines)
-
-    def _format_history_markdown(self, server_name: str, metric: str, period: str,
-                                  values: List[float], timestamps: List[int],
-                                  current: float, max_val: float, min_val: float,
-                                  avg_val: float, max_time: str, min_time: str,
-                                  start_time: str, end_time: str) -> str:
-        display_name = self.METRIC_DISPLAY_NAMES.get(metric, metric)
-        period_names = {"1d": "过去24小时", "7d": "过去7天", "30d": "过去30天"}
-
-        formatted_current = self._format_metric_value(current, metric)
-        formatted_max = self._format_metric_value(max_val, metric)
-        formatted_min = self._format_metric_value(min_val, metric)
-        formatted_avg = self._format_metric_value(avg_val, metric)
-
-        sparkline = self._generate_sparkline(values, width=30)
-
-        return f"""## 📈 {server_name} - {display_name}
-📅 {period_names.get(period, period)}
-
-| 统计 | 数值 |
-|------|------|
-| 🟢 **当前** | `{formatted_current}` |
-| 🔺 **最高** | `{formatted_max}` ({max_time}) |
-| 🔻 **最低** | `{formatted_min}` ({min_time}) |
-| 📊 **平均** | `{formatted_avg}` |
-
-```
-
-{sparkline}
-
-```
-`{start_time}`{' ' * 20}`{end_time}`
-"""
-
-    async def _send_result(self, event: AstrMessageEvent, t2i_data: Any,
-                           markdown_content: str, force_mode: Optional[str] = None) -> AsyncGenerator:
-        mode = force_mode or self.output_mode
-
-        if mode == "markdown":
-            yield event.plain_result(markdown_content)
-        else:
-            if isinstance(t2i_data, str):
-                yield event.image_result(t2i_data)
-            elif isinstance(t2i_data, dict):
-                template = await self._load_template()
-                try:
-                    image_url = await self.html_render(
-                        template,
-                        t2i_data,
-                        options={
-                            "full_page": True,
-                            "type": "png",
-                            "scale": "css",
-                            "timeout": 30000,
-                        },
-                    )
-                    if image_url:
-                        yield event.image_result(image_url)
-                    else:
-                        logger.warning("T2I 渲染失败，降级到 Markdown 输出")
-                        yield event.plain_result(markdown_content)
-                except Exception as e:
-                    logger.error(f"T2I 渲染失败: {e}")
-                    yield event.plain_result(f"❌ 图片渲染失败，已降级为文本模式：\n\n{markdown_content}")
+    async def _render_image(self, event: AstrMessageEvent, template_name: str,
+                            data: Dict[str, Any], error_msg: str = "图片生成失败") -> AsyncGenerator:
+        try:
+            template = await self._load_template(template_name)
+            image_url = await self.html_render(
+                template,
+                data,
+                options={
+                    "full_page": True,
+                    "type": "png",
+                    "scale": "css",
+                    "timeout": 30000,
+                },
+            )
+            if image_url:
+                yield event.image_result(image_url)
             else:
-                yield event.plain_result(markdown_content)
+                logger.error(f"渲染失败: {template_name}")
+                yield event.plain_result(f"❌ {error_msg}")
+        except asyncio.TimeoutError:
+            logger.error(f"渲染超时: {template_name}")
+            yield event.plain_result("❌ 渲染超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"渲染异常: {e}")
+            yield event.plain_result(self._format_error_message(e))
 
     @filter.command("nezha")
     async def nezha_cmd(self, event: AstrMessageEvent) -> AsyncGenerator:
@@ -935,9 +750,6 @@ class NezhaPlugin(Star):
 
         if sub_cmd == "help":
             yield event.plain_result(self.HELP_TEXT)
-        elif sub_cmd == "list":
-            async for result in self._handle_list(event):
-                yield result
         elif sub_cmd == "status":
             async for result in self._handle_status(event):
                 yield result
@@ -948,40 +760,46 @@ class NezhaPlugin(Star):
             else:
                 yield event.plain_result("❌ 请指定服务器 ID，如: `/nezha detail 1`")
         elif sub_cmd == "service":
-            async for result in self._handle_service_dispatch(event):
-                yield result
+            if len(parts) >= 3 and parts[2].lower() == "detail":
+                if len(parts) >= 4:
+                    async for result in self._handle_service_detail(event, parts[3]):
+                        yield result
+                else:
+                    yield event.plain_result("❌ 请指定服务 ID，如: `/nezha service detail 1`")
+            else:
+                async for result in self._handle_service_list(event):
+                    yield result
         elif sub_cmd == "history":
             async for result in self._handle_history_dispatch(event):
                 yield result
         else:
             yield event.plain_result(self.HELP_TEXT)
 
-    async def _handle_list(self, event: AstrMessageEvent) -> AsyncGenerator:
+    async def _handle_status(self, event: AstrMessageEvent) -> AsyncGenerator:
         servers = await self._fetch_servers()
         if servers is None:
-            yield event.plain_result("❌ 获取服务器列表失败：API 错误，请检查配置")
+            yield event.plain_result("❌ 获取状态失败：API 错误，请检查配置")
             return
         if not servers:
             yield event.plain_result("📭 暂无服务器")
             return
 
-        t2i_data = None
-        if self.output_mode == "t2i":
-            server_infos = [self._parse_server(svr) for svr in servers]
-            server_data = self._prepare_template_data(server_infos)
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            total = len(server_infos)
-            online_count = sum(1 for info in server_infos if info.online)
-            t2i_data = {
-                "total": total,
-                "online": online_count,
-                "offline": total - online_count,
-                "servers": server_data,
-                "update_time": now,
-            }
+        server_infos = [self._parse_server(svr) for svr in servers]
+        total = len(server_infos)
+        online_count = sum(1 for info in server_infos if info.online)
 
-        markdown_content = self._format_server_list_markdown(servers)
-        async for result in self._send_result(event, t2i_data, markdown_content):
+        server_data = self._prepare_server_data(server_infos)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        t2i_data = {
+            "total": total,
+            "online": online_count,
+            "offline": total - online_count,
+            "servers": server_data,
+            "update_time": now,
+        }
+
+        async for result in self._render_image(event, "status", t2i_data, "生成状态图片失败"):
             yield result
 
     async def _handle_detail(self, event: AstrMessageEvent, server_id: str) -> AsyncGenerator:
@@ -1003,84 +821,33 @@ class NezhaPlugin(Star):
             return
 
         info = self._parse_server(server)
-        markdown_content = self._format_server_detail_markdown(info)
-        async for result in self._send_result(event, None, markdown_content):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        t2i_data = {
+            "server": {
+                "name": info.name,
+                "online": info.online,
+                "cpu": info.cpu,
+                "mem_percent": info.mem_used / max(info.mem_total, 1) * 100,
+                "mem_used": self._format_bytes(info.mem_used),
+                "mem_total": self._format_bytes(info.mem_total),
+                "disk_percent": info.disk_used / max(info.disk_total, 1) * 100,
+                "disk_used": self._format_bytes(info.disk_used),
+                "disk_total": self._format_bytes(info.disk_total),
+                "uptime": self._format_uptime(info.uptime),
+                "platform": info.platform,
+                "platform_version": info.platform_version,
+                "net_in": self._format_bytes(info.net_in_transfer),
+                "net_out": self._format_bytes(info.net_out_transfer),
+                "last_active": info.last_active,
+                "country_code": info.geoip_country.lower() if info.geoip_country else "un",
+                "cpu_cores": "N/A",
+            },
+            "update_time": now,
+        }
+
+        async for result in self._render_image(event, "server_detail", t2i_data, "生成详情图片失败"):
             yield result
-
-    async def _handle_status(self, event: AstrMessageEvent) -> AsyncGenerator:
-        try:
-            servers = await self._fetch_servers()
-            if servers is None:
-                yield event.plain_result("❌ 获取状态失败：API 错误，请检查配置")
-                return
-            if not servers:
-                yield event.plain_result("📭 暂无服务器")
-                return
-
-            server_infos = [self._parse_server(svr) for svr in servers]
-            total = len(server_infos)
-            online_count = sum(1 for info in server_infos if info.online)
-            offline_count = total - online_count
-
-            server_data = self._prepare_template_data(server_infos)
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            t2i_data = {
-                "total": total,
-                "online": online_count,
-                "offline": offline_count,
-                "servers": server_data,
-                "update_time": now,
-            }
-
-            status_icon = "🟢" if online_count == total else ("🟡" if online_count > 0 else "🔴")
-            md_lines = [
-                f"## 📊 服务器状态概览",
-                f"{status_icon} **{online_count}/{total}** 在线",
-                "",
-                "| 服务器 | 状态 | CPU | 内存 | 磁盘 | 系统 |",
-                "|--------|------|-----|------|------|------|",
-            ]
-            for info in server_infos:
-                mem_percent = info.mem_used / max(info.mem_total, 1) * 100
-                disk_percent = info.disk_used / max(info.disk_total, 1) * 100
-                status = "🟢 在线" if info.online else "🔴 离线"
-                md_lines.append(f"| {info.name} | {status} | `{info.cpu:.1f}%` | `{mem_percent:.1f}%` | `{disk_percent:.1f}%` | {info.platform} |")
-            md_lines.append(f"\n🕐 更新时间: `{now}`")
-            markdown_content = "\n".join(md_lines)
-
-            async for result in self._send_result(event, t2i_data, markdown_content, force_mode="t2i"):
-                yield result
-
-        except Exception as e:
-            logger.error(f"状态查询失败: {e}")
-            yield event.plain_result(self._format_error_message(e, "status"))
-
-    async def _handle_service_dispatch(self, event: AstrMessageEvent) -> AsyncGenerator:
-        parts = event.message_str.strip().split()
-
-        if len(parts) < 3:
-            async for result in self._handle_service_list(event):
-                yield result
-            return
-
-        sub_sub_cmd = parts[2].lower()
-
-        if sub_sub_cmd == "list":
-            async for result in self._handle_service_list(event):
-                yield result
-        elif sub_sub_cmd == "detail":
-            if len(parts) >= 4:
-                async for result in self._handle_service_detail(event, parts[3]):
-                    yield result
-            else:
-                yield event.plain_result("❌ 请指定服务 ID，如: `/nezha service detail 1`")
-        else:
-            yield event.plain_result(
-                "📖 **服务监控子命令**\n\n"
-                "`/nezha service list` - 列出所有服务监控\n"
-                "`/nezha service detail <ID>` - 查看服务详情"
-            )
 
     async def _handle_service_list(self, event: AstrMessageEvent) -> AsyncGenerator:
         services = await self._fetch_services()
@@ -1091,8 +858,35 @@ class NezhaPlugin(Star):
             yield event.plain_result("📭 暂无服务监控")
             return
 
-        markdown_content = self._format_service_list_markdown(services)
-        async for result in self._send_result(event, None, markdown_content, force_mode="markdown"):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        total = len(services)
+        online = sum(1 for s in services if s.get("status") == self.SERVICE_STATUS_ONLINE)
+        offline = sum(1 for s in services if s.get("status") == self.SERVICE_STATUS_OFFLINE)
+
+        service_data = []
+        for svc in services:
+            status = svc.get("status", self.SERVICE_STATUS_UNKNOWN)
+            icon, status_text = self._parse_service_status(status)
+            status_class = "online" if status == self.SERVICE_STATUS_ONLINE else "offline" if status == self.SERVICE_STATUS_OFFLINE else "unknown"
+            avg_delay = svc.get("avg_delay", 0)
+            service_data.append({
+                "id": svc.get("id", "N/A"),
+                "name": svc.get("name", "未命名"),
+                "status": status_text,
+                "status_class": status_class,
+                "up_percent": svc.get("up_percent", 0),
+                "avg_delay": f"{avg_delay:.1f}ms" if avg_delay > 0 else "N/A",
+            })
+
+        t2i_data = {
+            "services": service_data,
+            "total": total,
+            "online": online,
+            "offline": offline,
+            "update_time": now,
+        }
+
+        async for result in self._render_image(event, "service_list", t2i_data, "生成服务列表图片失败"):
             yield result
 
     async def _handle_service_detail(self, event: AstrMessageEvent, service_id: str) -> AsyncGenerator:
@@ -1105,8 +899,72 @@ class NezhaPlugin(Star):
             yield event.plain_result(f"❌ 获取服务 ID {service_id} 详情失败，请确认 ID 是否正确")
             return
 
-        markdown_content = self._format_service_detail_markdown(service_data)
-        async for result in self._send_result(event, None, markdown_content):
+        service_name = service_data.get("service_name", "未命名")
+        servers = service_data.get("servers", [])
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if not servers:
+            t2i_data = {
+                "service_name": service_name,
+                "servers": [],
+                "overall_up_percent": 0,
+                "overall_avg_delay": "N/A",
+                "total_checks": 0,
+                "overall_status_text": "未知",
+                "overall_status_class": "unknown",
+                "update_time": now,
+            }
+            async for result in self._render_image(event, "service_detail", t2i_data, "生成服务详情图片失败"):
+                yield result
+            return
+
+        total_up = 0
+        total_down = 0
+        total_avg_delay = 0
+        server_items = []
+
+        for svr in servers:
+            stats = svr.get("stats", {})
+            up = stats.get("total_up", 0)
+            down = stats.get("total_down", 0)
+            avg_delay = stats.get("avg_delay", 0)
+            up_percent = stats.get("up_percent", 0)
+
+            total_up += up
+            total_down += down
+            total_avg_delay += avg_delay
+
+            status_class = "online" if up_percent >= 95 else "offline" if up_percent >= 50 else "warning"
+            status_text = "在线" if up_percent >= 95 else "异常" if up_percent >= 50 else "离线"
+
+            server_items.append({
+                "server_name": svr.get("server_name", "未知服务器"),
+                "up_percent": up_percent,
+                "avg_delay": f"{avg_delay:.1f}ms" if avg_delay > 0 else "N/A",
+                "status_class": status_class,
+                "status_text": status_text,
+            })
+
+        total_checks = total_up + total_down
+        overall_up_percent = (total_up / total_checks * 100) if total_checks > 0 else 0
+        overall_avg_delay = f"{total_avg_delay / len(servers):.1f}ms" if servers else "N/A"
+
+        overall_status_text = "在线" if overall_up_percent >= 95 else "异常" if overall_up_percent >= 50 else "离线"
+        overall_status_class = "online" if overall_up_percent >= 95 else "offline" if overall_up_percent >= 50 else "unknown"
+
+        t2i_data = {
+            "service_name": service_name,
+            "servers": server_items,
+            "overall_up_percent": overall_up_percent,
+            "overall_avg_delay": overall_avg_delay,
+            "total_checks": total_checks,
+            "overall_status_text": overall_status_text,
+            "overall_status_class": overall_status_class,
+            "update_time": now,
+        }
+
+        async for result in self._render_image(event, "service_detail", t2i_data, "生成服务详情图片失败"):
             yield result
 
     async def _handle_history_dispatch(self, event: AstrMessageEvent) -> AsyncGenerator:
@@ -1217,11 +1075,47 @@ class NezhaPlugin(Star):
         start_time = format_timestamp(timestamps[0]) if timestamps else ""
         end_time = format_timestamp(timestamps[-1]) if timestamps else ""
 
-        markdown_content = self._format_history_markdown(
-            server_name, metric, period, values, timestamps,
-            current, max_val, min_val, avg_val,
-            max_time, min_time, start_time, end_time
-        )
+        display_name = self.METRIC_DISPLAY_NAMES.get(metric, metric)
+        period_names = {"1d": "过去24小时", "7d": "过去7天", "30d": "过去30天"}
 
-        async for result in self._send_result(event, None, markdown_content):
+        def format_metric_value(value: float) -> str:
+            if metric in ("net_in_transfer", "net_out_transfer"):
+                return self._format_bytes(int(value))
+            if metric == "uptime":
+                return self._format_uptime(int(value))
+            return f"{value:.2f}{self.METRIC_UNITS.get(metric, '')}"
+
+        # 生成 SVG 折线图数据点
+        if len(values) > 1:
+            min_val_plot = min(values)
+            max_val_plot = max(values)
+            range_val_plot = max_val_plot - min_val_plot if max_val_plot != min_val_plot else 1
+            points = []
+            for i, v in enumerate(values):
+                x = (i / max(len(values) - 1, 1)) * 600
+                y = 140 - ((v - min_val_plot) / range_val_plot) * 120 - 10
+                points.append(f"{x:.1f},{y:.1f}")
+            points_str = " ".join(points)
+        else:
+            points_str = ""
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        t2i_data = {
+            "server_name": server_name,
+            "metric_name": display_name,
+            "period_label": period_names.get(period, period),
+            "current_value": format_metric_value(current),
+            "max_value": format_metric_value(max_val),
+            "max_time": max_time,
+            "min_value": format_metric_value(min_val),
+            "min_time": min_time,
+            "avg_value": format_metric_value(avg_val),
+            "points": points_str,
+            "start_time": start_time,
+            "end_time": end_time,
+            "update_time": now,
+        }
+
+        async for result in self._render_image(event, "history", t2i_data, "生成历史趋势图片失败"):
             yield result
