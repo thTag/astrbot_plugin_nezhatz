@@ -1213,7 +1213,7 @@ class NezhaPlugin(Star):
 
         async for result in self._send_result(event, None, markdown_content):
             yield result
-```    uptime: int
+    uptime: int
     platform: str
     platform_version: str
     net_in_transfer: int
