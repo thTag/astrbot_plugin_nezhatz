@@ -26,6 +26,17 @@
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
+    .header-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+    .logo {
+        height: 40px;
+        width: auto;
+        display: block;
+    }
     .header {
         display: flex;
         justify-content: space-between;
@@ -97,7 +108,9 @@
         justify-content: flex-end;
         font-size: 13px;
         color: #4a5a7a;
+        gap: 12px;
     }
+    .footer .brand { color: #6a7a9a; }
     @media (max-width: 600px) {
         .stats-grid { grid-template-columns: 1fr 1fr; }
     }
@@ -105,6 +118,9 @@
 </head>
 <body>
 <div class="container">
+    <div class="header-top">
+        <img class="logo" src="https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
+    </div>
     <div class="header">
         <h1>📈 {{ server_name }} - {{ metric_name }}</h1>
         <span class="period-badge">{{ period_label }}</span>
@@ -138,7 +154,6 @@
             <!-- 折线 -->
             <polyline points="{{ points }}" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-            <!-- 渐变定义 -->
             <defs>
                 <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                     <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.6"/>
@@ -148,11 +163,16 @@
         </svg>
         <div class="chart-labels">
             <span>{{ start_time }}</span>
+            <span>{{ mid_time }}</span>
             <span>{{ end_time }}</span>
         </div>
     </div>
 
-    <div class="footer">⚡ 哪吒探针 · 更新于 {{ update_time }}</div>
+    <div class="footer">
+        <span class="brand">⚡ 哪吒探针</span>
+        <span>·</span>
+        <span>更新于 {{ update_time }}</span>
+    </div>
 </div>
 </body>
 </html>
