@@ -26,12 +26,16 @@
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .back-link {
-        display: inline-block;
+    .header-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
         margin-bottom: 16px;
-        color: #4a5a7a;
-        font-size: 14px;
-        text-decoration: none;
+    }
+    .logo {
+        height: 40px;
+        width: auto;
+        display: block;
     }
     .header {
         display: flex;
@@ -108,7 +112,9 @@
         justify-content: flex-end;
         font-size: 13px;
         color: #4a5a7a;
+        gap: 12px;
     }
+    .footer .brand { color: #6a7a9a; }
     @media (max-width: 600px) {
         .summary { grid-template-columns: 1fr 1fr; }
     }
@@ -116,6 +122,9 @@
 </head>
 <body>
 <div class="container">
+    <div class="header-top">
+        <img class="logo" src="https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
+    </div>
     <div class="header">
         <h1>📋 {{ service_name }}</h1>
         <span class="status-badge {{ overall_status_class }}">
@@ -148,7 +157,11 @@
         </tbody>
     </table>
 
-    <div class="footer">⚡ 哪吒探针 · 更新于 {{ update_time }}</div>
+    <div class="footer">
+        <span class="brand">⚡ 哪吒探针</span>
+        <span>·</span>
+        <span>更新于 {{ update_time }}</span>
+    </div>
 </div>
 </body>
 </html>
