@@ -26,6 +26,17 @@
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
+    .header-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .logo {
+        height: 40px;
+        width: auto;
+        display: block;
+    }
     .header {
         display: flex;
         justify-content: space-between;
@@ -123,7 +134,9 @@
         justify-content: flex-end;
         font-size: 13px;
         color: #4a5a7a;
+        gap: 12px;
     }
+    .footer .brand { color: #6a7a9a; }
     @media (max-width: 600px) {
         .service-card { flex-direction: column; align-items: stretch; }
         .service-stats { justify-content: space-between; }
@@ -132,6 +145,9 @@
 </head>
 <body>
 <div class="container">
+    <div class="header-top">
+        <img class="logo" src="https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
+    </div>
     <div class="header">
         <h1>📊 服务监控</h1>
         <div class="stats">
@@ -143,7 +159,7 @@
 
     <div class="service-grid">
         {% for svc in services %}
-        <div class="service-card {% if svc.status == '离线' %}offline{% endif %}">
+        <div class="service-card {% if svc.status == '连接异常' %}offline{% endif %}">
             <div class="service-info">
                 <span class="service-name">{{ svc.name }}</span>
                 <span class="service-id">ID: {{ svc.id }}</span>
@@ -167,7 +183,11 @@
         {% endfor %}
     </div>
 
-    <div class="footer">⚡ 哪吒探针 · 更新于 {{ update_time }}</div>
+    <div class="footer">
+        <span class="brand">⚡ 哪吒探针</span>
+        <span>·</span>
+        <span>更新于 {{ update_time }}</span>
+    </div>
 </div>
 </body>
 </html>
