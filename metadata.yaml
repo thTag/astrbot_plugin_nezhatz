@@ -3,5 +3,5 @@ display_name: 哪吒探针
 desc: 查看哪吒监控站点的服务器状态等信息
 short_desc: 哪吒监控面板状态查询工具
 author: 叹号大帝
-version: v1.0.0
+version: v1.2.0
 repo: https://github.com/thTag/astrbot_plugin_nezhatz
