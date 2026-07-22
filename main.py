@@ -714,9 +714,9 @@ class NezhaPlugin(Star):
 
     def _parse_service_status(self, status: int) -> tuple[str, str]:
         if status == self.SERVICE_STATUS_ONLINE:
-            return "🟢", "正常"
+            return "🟢", "连接正常"
         elif status == self.SERVICE_STATUS_OFFLINE:
-            return "🔴", "异常"
+            return "🔴", "连接异常"
         else:
             return "⚪", "未知"
 
@@ -945,7 +945,7 @@ class NezhaPlugin(Star):
             total_avg_delay += avg_delay
 
             status_class = "online" if up_percent >= 95 else "offline" if up_percent >= 50 else "warning"
-            status_text = "正常" if up_percent >= 95 else "异常" if up_percent >= 50 else "异常"
+            status_text = "连接正常" if up_percent >= 95 else "连接异常" if up_percent >= 50 else "连接异常"
 
             server_items.append({
                 "server_name": svr.get("server_name", "未知服务器"),
@@ -959,7 +959,7 @@ class NezhaPlugin(Star):
         overall_up_percent = (total_up / total_checks * 100) if total_checks > 0 else 0
         overall_avg_delay = f"{total_avg_delay / len(servers):.1f}ms" if servers else "N/A"
 
-        overall_status_text = "正常" if overall_up_percent >= 95 else "异常" if overall_up_percent >= 50 else "异常"
+        overall_status_text = "连接正常" if overall_up_percent >= 95 else "连接异常" if overall_up_percent >= 50 else "连接异常"
         overall_status_class = "online" if overall_up_percent >= 95 else "offline" if overall_up_percent >= 50 else "unknown"
 
         t2i_data = {
@@ -1098,6 +1098,10 @@ class NezhaPlugin(Star):
         start_time = format_timestamp(timestamps[0]) if timestamps else ""
         end_time = format_timestamp(timestamps[-1]) if timestamps else ""
 
+        # 计算中间时间点
+        mid_idx = len(timestamps) // 2 if timestamps else 0
+        mid_time = format_timestamp(timestamps[mid_idx]) if timestamps else ""
+
         display_name = self.METRIC_DISPLAY_NAMES.get(metric, metric)
         period_names = {"1d": "过去24小时", "7d": "过去7天", "30d": "过去30天"}
 
@@ -1138,6 +1142,7 @@ class NezhaPlugin(Star):
             "avg_value": format_metric_value(avg_val),
             "points": points_str,
             "start_time": start_time,
+            "mid_time": mid_time,
             "end_time": end_time,
             "update_time": now,
         }
