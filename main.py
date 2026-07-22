@@ -618,7 +618,9 @@ class NezhaPlugin(Star):
         return server_data
 
     def _format_metric_value(self, value: float, metric: str) -> str:
-        if metric in ("net_in_transfer", "net_out_transfer", "disk"):
+        if metric == "disk":
+            return f"{value:.1f}%"
+        if metric in ("net_in_transfer", "net_out_transfer"):
             return self._format_bytes(int(value))
         if metric == "uptime":
             return self._format_uptime(int(value))
@@ -1087,7 +1089,7 @@ class NezhaPlugin(Star):
                     dt = datetime.fromtimestamp(ts / 1000)
                 else:
                     dt = datetime.fromtimestamp(ts)
-                return dt.strftime("%H:%M")
+                return dt.strftime("%m-%d %H:%M")
             except:
                 return ""
 
@@ -1100,7 +1102,9 @@ class NezhaPlugin(Star):
         period_names = {"1d": "过去24小时", "7d": "过去7天", "30d": "过去30天"}
 
         def format_metric_value(value: float) -> str:
-            if metric in ("net_in_transfer", "net_out_transfer", "disk"):
+            if metric == "disk":
+                return f"{value:.1f}%"
+            if metric in ("net_in_transfer", "net_out_transfer"):
                 return self._format_bytes(int(value))
             if metric == "uptime":
                 return self._format_uptime(int(value))
