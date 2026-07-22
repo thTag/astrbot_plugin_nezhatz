@@ -18,7 +18,7 @@
         padding: 30px;
     }
     .container {
-        width: 720px;
+        width: 760px;
         max-width: 100%;
         background: #111111;
         border-radius: 32px;
@@ -73,10 +73,12 @@
         border-radius: 16px;
         padding: 20px 24px 16px;
         border: 1px solid rgba(255,255,255,0.05);
+        position: relative;
     }
     .chart-svg {
         width: 100%;
-        height: 160px;
+        height: 200px;
+        display: block;
     }
     .chart-labels {
         display: flex;
@@ -84,6 +86,7 @@
         font-size: 12px;
         color: #4a5a7a;
         margin-top: 6px;
+        padding: 0 4px;
     }
 
     .footer {
@@ -115,20 +118,31 @@
     </div>
 
     <div class="chart-container">
-        <svg class="chart-svg" viewBox="0 0 600 140" preserveAspectRatio="xMidYMid meet">
-            <polyline
-                points="{{ points }}"
-                fill="none"
-                stroke="url(#grad)"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            />
+        <svg class="chart-svg" viewBox="0 0 700 200" preserveAspectRatio="xMidYMid meet">
+            <!-- 网格线 -->
+            <line x1="40" y1="30" x2="680" y2="30" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="40" y1="72" x2="680" y2="72" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="40" y1="115" x2="680" y2="115" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="40" y1="157" x2="680" y2="157" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+
+            <!-- Y轴标签 -->
+            <text x="35" y="34" font-size="10" fill="#4a5a7a" text-anchor="end">100%</text>
+            <text x="35" y="76" font-size="10" fill="#4a5a7a" text-anchor="end">75%</text>
+            <text x="35" y="119" font-size="10" fill="#4a5a7a" text-anchor="end">50%</text>
+            <text x="35" y="161" font-size="10" fill="#4a5a7a" text-anchor="end">25%</text>
+            <text x="35" y="185" font-size="10" fill="#4a5a7a" text-anchor="end">0%</text>
+
+            <!-- 面积填充 -->
+            <polygon points="40,175 {{ points }} 680,175" fill="url(#areaGrad)" opacity="0.3"/>
+
+            <!-- 折线 -->
+            <polyline points="{{ points }}" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+            <!-- 渐变定义 -->
             <defs>
-                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
-                    <stop offset="50%" style="stop-color:#60a5fa;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1" />
+                <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.6"/>
+                    <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:0.0"/>
                 </linearGradient>
             </defs>
         </svg>
