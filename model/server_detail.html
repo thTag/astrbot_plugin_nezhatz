@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>服务器详情 - {{ server.name }}</title>
 <link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
-<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/font-logos@1/assets/font-logos.css">
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -28,23 +27,27 @@
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .back-link {
-        display: inline-block;
+    .header-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
         margin-bottom: 20px;
-        color: #4a5a7a;
-        text-decoration: none;
-        font-size: 14px;
     }
-    .back-link:hover { color: #6a8aaa; }
+    .logo {
+        height: 40px;
+        width: auto;
+        display: block;
+    }
     .header {
         display: flex;
         align-items: center;
         gap: 16px;
         margin-bottom: 24px;
+        flex-wrap: wrap;
     }
-    .flag-icon { font-size: 40px; line-height: 1; }
+    .flag-icon { font-size: 36px; line-height: 1; }
     .header h1 {
-        font-size: 28px;
+        font-size: 26px;
         font-weight: 700;
         background: linear-gradient(135deg, #ffffff 60%, #8888cc 100%);
         -webkit-background-clip: text;
@@ -100,12 +103,8 @@
     .info-item .label { color: #6a7a9a; font-size: 14px; }
     .info-item .value { color: #e8edf5; font-weight: 500; font-size: 15px; }
 
-    .progress-section {
-        margin-top: 8px;
-    }
-    .progress-item {
-        margin-bottom: 14px;
-    }
+    .progress-section { margin-top: 8px; }
+    .progress-item { margin-bottom: 14px; }
     .progress-item .label-row {
         display: flex;
         justify-content: space-between;
@@ -121,11 +120,7 @@
         border-radius: 10px;
         overflow: hidden;
     }
-    .progress-track .bar {
-        height: 100%;
-        border-radius: 10px;
-        transition: width 0.3s;
-    }
+    .progress-track .bar { height: 100%; border-radius: 10px; transition: width 0.3s; }
     .bar.green { background: linear-gradient(90deg, #4ade80, #22d3ee); }
     .bar.yellow { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
     .bar.red { background: linear-gradient(90deg, #f87171, #ef4444); }
@@ -138,7 +133,9 @@
         justify-content: flex-end;
         font-size: 13px;
         color: #4a5a7a;
+        gap: 12px;
     }
+    .footer .brand { color: #6a7a9a; }
     @media (max-width: 600px) {
         .info-grid { grid-template-columns: 1fr; }
         .header { flex-wrap: wrap; }
@@ -148,6 +145,9 @@
 </head>
 <body>
 <div class="container">
+    <div class="header-top">
+        <img class="logo" src="https://raw.githubusercontent.com/thTag/astrbot_plugin_nezhatz/c17f37c9147ca93487b2fe13e3e58960d0dcd91e/logo.png" alt="哪吒监控" />
+    </div>
     <div class="header">
         <span class="flag-icon fi fi-{{ server.country_code }}"></span>
         <h1>{{ server.name }}</h1>
@@ -181,7 +181,11 @@
         </div>
     </div>
 
-    <div class="footer">⚡ 哪吒探针 · 更新于 {{ update_time }}</div>
+    <div class="footer">
+        <span class="brand">⚡ 哪吒探针</span>
+        <span>·</span>
+        <span>更新于 {{ update_time }}</span>
+    </div>
 </div>
 </body>
 </html>
